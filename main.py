@@ -104,13 +104,15 @@ def showBillWithCryo():
 
 def showBillWithTransported():
     bill = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
-    fig = plt.figure(figsize=(10, 20))
+    fig = plt.figure(figsize=(10, 15))
     for i, name in enumerate(bill):
-        ax = fig.add_subplot(5, 2, 2 * i + 1)
-        sns.histplot(data=train, x=name, axes=ax, kde=True, hue="Transported")
-        plt.ylim(200)
+        ax = fig.add_subplot(3,2, i+1)
+        sns.histplot(data=train, x=name, bins=20, axes=ax, kde=True, hue="Transported")
+        plt.xlim([0,4000])
+        plt.ylim([0,2000])
         ax.set_title(name)
-    fig.tight_layout()
+        plt.subplots_adjust(hspace=0.5)
+    #fig.tight_layout()
     plt.show()
 
 
@@ -142,8 +144,14 @@ def missingValuesHomePlanet(df: DataFrame):
 
 
 def createLuxeBasic(df: DataFrame):
-    showBillWithTransported()
+    #showBillWithTransported()
+    df["Luxury"] = df["RoomService"] + df["Spa"] + df["VRDeck"]
+    df["Basics"] = df["ShoppingMall"] + df["FoodCourt"]
 
+    corr_l = df["Luxury"].corr(df["Transported"])
+    corr_b = df["Basics"].corr(df["Transported"])
+    print("Correlation entre Luxury et transported : " + str(corr_l))
+    print("Correlation entre Basics et transported : " + str(corr_b))
 
 def createNoBill(df: DataFrame):
     df["NoBill"] = (df[["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]].sum(axis=1) == 0).astype('int64')
