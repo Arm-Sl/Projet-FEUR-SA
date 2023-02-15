@@ -202,18 +202,19 @@ def missingValueSide(df: DataFrame):
         if len(side.values) > 0:
             df.at[index, "Side"] = group["Side"][side.values[0]]
     print("Side missing values: ", df["Side"].isna().sum())
+
     missingSide = df.loc[(df["Side"].isna())]
     for index, row in missingSide.iterrows():
         group = df.loc[(df["Surname"] == row["Surname"]) & (df["Group_size"] > 1), np.array(["Side", "Surname"])]
         side = group[~group["Side"].isna()].index
         if len(side.values) > 0:
-            df.at[index, "Side"] = group["Side"][side.values[0]]
+            # Met la valeur de Side la plus présente parmis le Surname
+            df.at[index, "Side"] = group["Side"].value_counts().index[0]
+
     print("Side missing values: ", df["Side"].isna().sum())
-'''
-def replaceSpaces(df):
-    df.columns = df.columns.str.replace(' ', '_')
-    return df
-'''
+    df.loc[(df["Side"].isna()), "Side"] = "P"
+    print("Side missing values: ", df["Side"].isna().sum())
+
 
 def createLuxeBasic(df: DataFrame):
     #showBillWithTransported()
@@ -258,9 +259,20 @@ def studyMissingValuesVIP(df: DataFrame):
 
 def studyMissingValuesSide(df: DataFrame):
     groupSide = (df.groupby(["Group", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
-    surnameSide = (df[df["Group_size"] > 1].groupby(["Surname", "Side"])["Side"].size().unstack().fillna(0) > 0)
-    sns.histplot(surnameSide.sum(axis=1), kde=False, bins=40)
+    surnameSide = (df[df["Group_size"] > 1].groupby(["Surname", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
+    sideSolo = df[df["Solo"] == 1]
+
+    sns.barplot(x=groupSide.value_counts().index, y = groupSide.value_counts().values)
+    plt.title("Nombre de Side par Groupe")
+    plt.show()
+
+   
+    sns.barplot(x=surnameSide.value_counts().index, y = surnameSide.value_counts().values)
     plt.title("Nombre de Side par Surname")
+    plt.show()
+
+    sns.countplot(sideSolo, x="Side")
+    plt.title("Répartition des Side pour les passagers voyageant seul")
     plt.show()
 
 
@@ -468,7 +480,8 @@ missingValueVIP(train)
 """
 createSolo(train)
 missingValueSide(train)
-missingValuesHomePlanet(train)
+#missingValuesHomePlanet(train)
+#studyMissingValuesSide(train)
 
 """
 train_process = preprocessing(train)
