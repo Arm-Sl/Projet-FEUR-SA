@@ -32,6 +32,7 @@ test = pd.read_csv('./Data/test.csv')
 
 # Calcul de correlations avec l'age
 def findAgeIntervals(train):
+    train.loc[train["Age"].isna(), "Age"] = train["Age"].median()
     prevAge = 0
     currentAge = 2
     currentInterval = train.loc[(train["Age"] >= prevAge) & (train["Age"] < currentAge)]
@@ -67,13 +68,9 @@ def findAgeIntervals(train):
     print(abs(s2["Age"].corr(s2["Transported"])))
     print(abs(s["Age"].corr(s["Transported"])) - abs(s2["Age"].corr(s2["Transported"])))
 
-    train["Age_group"] = np.nan
-    prevAge = 0
-    for i in range(1, len(liste)):
-        train.loc[(train['Age'] >= prevAge) & (train['Age'] <= liste[i]), "Age_group"] = i - 1
-        prevAge = liste[i]
+    return liste
+    
 
-    print(train["Age_group"].corr(train["Transported"]))
 
 
 # Graphiques
@@ -137,14 +134,14 @@ def showAgeWithTransported():
 
 def missingValuesBill(df: DataFrame):
     bill = np.array(["RoomService", "Spa", "ShoppingMall", "VRDeck", "FoodCourt"])
-    print("Nombre valeurs manquantes bill :",df[bill].isna().sum().sum())
+    print("Bill missing values :",df[bill].isna().sum().sum())
     for b in bill:
         df.loc[(df[b].isna()) & (df['CryoSleep'] == True), b] = 0
-    print("Nombre valeurs manquantes bill :",df[bill].isna().sum().sum())
+    print("Bill missing values :",df[bill].isna().sum().sum())
 
     for b in bill:
         df.loc[(df[b].isna()), b] = df[b].median()
-    print("Nombre valeurs manquantes bill :", df[bill].isna().sum().sum())
+    print("Bill missing values :", df[bill].isna().sum().sum())
 
     # Update NoBill Column
     df.loc[(df["RoomService"]+df["Spa"]+df["ShoppingMall"]+df["VRDeck"]+df["FoodCourt"] == 0), "NoBill"] = 1
@@ -153,11 +150,8 @@ def missingValuesBill(df: DataFrame):
     df["Basics"] = df["ShoppingMall"] + df["FoodCourt"]
 
 def missingValuesHomePlanet(df: DataFrame):
-    print(len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
     linesMissingHomePlanet = df[df['HomePlanet'].isna()]
-
-    print(df.iloc[5371])
-
 
     for index, row in linesMissingHomePlanet.iterrows():
         group = df.loc[df["Group"] == row["Group"], ["HomePlanet", "Group"]]
@@ -165,7 +159,7 @@ def missingValuesHomePlanet(df: DataFrame):
         if(len(homeplanet.values) > 0):
             df.at[index, "HomePlanet"] = group["HomePlanet"][homeplanet.values[0]]
 
-    print(len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
 
     linesMissingHomePlanet = df[df['HomePlanet'].isna()]
 
@@ -178,7 +172,7 @@ def missingValuesHomePlanet(df: DataFrame):
             df.at[index, "HomePlanet"] = surname["HomePlanet"][homeplanet.values[0]]
 
 
-    print(len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
     print(df[df['HomePlanet'].isna()]["Deck"])
 
 
@@ -226,6 +220,17 @@ def missingValueDestination(df: DataFrame):
     print("Destination missing values: ", df["Destination"].isna().sum())
     df.loc[(df["Destination"].isna()), "Destination"] = "TRAPPIST-1e"
     print("Destination missing values: ", df["Destination"].isna().sum())
+
+def createAgeGroup(df: DataFrame):
+    print("Age missing values: ", df["Age"].isna().sum())
+    df.loc[df["Age"].isna(), "Age"] = df["Age"].median()
+    print("Age missing values: ", df["Age"].isna().sum())
+    liste = findAgeIntervals(train)
+    df["Age_group"] = np.nan
+    prevAge = 0
+    for i in range(1, len(liste)):
+        df.loc[(df['Age'] >= prevAge) & (df['Age'] <= liste[i]), "Age_group"] = i - 1
+        prevAge = liste[i]
 
 def createLuxeBasic(df: DataFrame):
     #showBillWithTransported()
@@ -350,6 +355,9 @@ def missingValues(df):
     missingValuesHomePlanet(df)
     missingValuesBill(df)
     missingValuesCryoSleep(df)
+    missingValueDestination(df)
+    missingValueSide(df)
+    missingValueVIP(df)
 
 def studyMissingValues(df: DataFrame):
     df = df.copy(deep=True)
@@ -388,51 +396,21 @@ def separateColumns(df: DataFrame):
 
 
 def preprocessing(df):
+    separateColumns(df)
+    createNoBill(df)
+    createSolo(df)
+    createLuxeBasic(df)
+    createAgeGroup(df)
+    missingValues(df)
+    print(df.info())
     # Initialise les colones numeriques et nominales
-    """numerical = df.select_dtypes("float64", None)
-    nominal = df.select_dtypes("object", None)
-
-    # On remplace les données manquantes numériques
-    numerical["Age"] = SimpleImputer(strategy="median").fit_transform(numerical[["Age"]])
-    numerical["RoomService"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(
-        numerical[["RoomService"]])
-    numerical["FoodCourt"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(numerical[["FoodCourt"]])
-    numerical["ShoppingMall"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(
-        numerical[["ShoppingMall"]])
-    numerical["Spa"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(numerical[["Spa"]])
-    numerical["VRDeck"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(numerical[["VRDeck"]])
-
-    # Creation des tranches d'ages en fonction du graphe obtenu
-    findAgeIntervals(train)
-
-    numerical.drop("Age", axis=1, inplace=True)
-
-    numerical["b_needs"] = numerical["FoodCourt"] + numerical["ShoppingMall"]
-    numerical["l_needs"] = numerical["RoomService"] + numerical["Spa"] + numerical["VRDeck"]
-
-    numerical.drop("FoodCourt", axis=1, inplace=True)
-    numerical.drop("ShoppingMall", axis=1, inplace=True)
-    numerical.drop("VRDeck", axis=1, inplace=True)
-    numerical.drop("RoomService", axis=1, inplace=True)
-    numerical.drop("Spa", axis=1, inplace=True)
-
-    # nb de valeurs
-    # print(train.nunique())
-
-    # Remplace les strings par des int
-    for column in nominal:
-        nominal[column], uniques = pd.factorize(nominal[column])
-
-    # Remplace les données manquantes
-    for column in nominal:
-        nominal[column] = SimpleImputer(missing_values=-1, strategy="most_frequent").fit_transform(nominal[[column]])
-
+    """
     newDf = pd.concat([numerical, nominal, homePlanete, destination, sides], axis=1)
     # Normalise les données
     for column in newDf:
         newDf[column] = MinMaxScaler().fit_transform(np.array(newDf[column]).reshape(-1, 1))
     return newDf
-"""
+    """
 
 # Random forest feature importante
 def randomForest():
@@ -480,31 +458,10 @@ def Logistic(train_process, test_process, y):
     submit.to_csv("./Data/submit.csv", index=False)
 
 
-"""showDeckTransported()
-showAgeWithTransported()
-showBillWithTransported()
-showBillWithCryo()
-showVIPWithTransported()"""
-
-
-# studyMissingValues(train)
-separateColumns(train)
-"""
-createNoBill(train)
-createSolo(train)
-createLuxeBasic(train)
-missingValuesCryoSleep(train)
-missingValuesBill(train)
-missingValueVIP(train)
-"""
-missingValueDestination(train)
-#missingValueSide(train)
-#missingValuesHomePlanet(train)
-
+train_process = preprocessing(train.copy())
+test_process = preprocessing(test.copy())
 
 """
-train_process = preprocessing(train)
-
 #graph(train_process, "Transported", "l_needs")
 test_process = preprocessing(test)
 y = train["Transported"]
