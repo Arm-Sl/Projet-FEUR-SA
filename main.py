@@ -87,7 +87,6 @@ def graph(data, x, y, type="strip"):
 
     plt.show()
 
-
 def showBillWithCryo():
     fig = plt.figure(figsize=(10, 20))
     bill = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
@@ -100,7 +99,6 @@ def showBillWithCryo():
         ax.set_title(name)
     fig.tight_layout()
     plt.show()
-
 
 def showBillWithTransported():
     bill = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
@@ -115,7 +113,6 @@ def showBillWithTransported():
     #fig.tight_layout()
     plt.show()
 
-
 def showDeckTransported():
     trainC = train.copy()
     trainC[["Deck", "Num", "Side"]] = trainC["Cabin"].str.split('/', expand=True)
@@ -129,7 +126,6 @@ def showDeckTransported():
     fig.tight_layout()
     plt.show()
 
-
 def showAgeWithTransported():
     plt.figure(figsize=(10, 4))
     sns.histplot(data=train, x='Age', hue='Transported', binwidth=1, kde=True)
@@ -137,44 +133,119 @@ def showAgeWithTransported():
     plt.show()
 
 
-# Preprocessing
+#TODO Missing Values Preprocessing
+
+def missingValuesBill(df: DataFrame):
+    bill = np.array(["RoomService", "Spa", "ShoppingMall", "VRDeck", "FoodCourt"])
+    print("Nombre valeurs manquantes bill :",df[bill].isna().sum().sum())
+    for b in bill:
+        df.loc[(df[b].isna()) & (df['CryoSleep'] == True), b] = 0
+    print("Nombre valeurs manquantes bill :",df[bill].isna().sum().sum())
+
+    for b in bill:
+        df.loc[(df[b].isna()), b] = df[b].median()
+    print("Nombre valeurs manquantes bill :", df[bill].isna().sum().sum())
+
+    # Update NoBill Column
+    df.loc[(df["RoomService"]+df["Spa"]+df["ShoppingMall"]+df["VRDeck"]+df["FoodCourt"] == 0), "NoBill"] = 1
+    # Update Luxe/Basics
+    df["Luxury"] = df["RoomService"] + df["Spa"] + df["VRDeck"]
+    df["Basics"] = df["ShoppingMall"] + df["FoodCourt"]
 
 def missingValuesHomePlanet(df: DataFrame):
-    print("feur")
+    print(len(df[df['HomePlanet'].isna()]))
+    linesMissingHomePlanet = df[df['HomePlanet'].isna()]
 
+    print(df.iloc[5371])
+
+
+    for index, row in linesMissingHomePlanet.iterrows():
+        group = df.loc[df["Group"] == row["Group"], ["HomePlanet", "Group"]]
+        homeplanet = group[~group["HomePlanet"].isna()].index
+        if(len(homeplanet.values) > 0):
+            df.at[index, "HomePlanet"] = group["HomePlanet"][homeplanet.values[0]]
+
+    print(len(df[df['HomePlanet'].isna()]))
+
+    linesMissingHomePlanet = df[df['HomePlanet'].isna()]
+
+    for index, row in linesMissingHomePlanet.iterrows():
+        surname = df.loc[df["Surname"] == row["Surname"], ["HomePlanet", "Surname"]]
+        homeplanet = surname[~surname["HomePlanet"].isna()].index
+        if(len(homeplanet.values) > 0):
+            if(index == 5371):
+                print(homeplanet.values)
+            df.at[index, "HomePlanet"] = surname["HomePlanet"][homeplanet.values[0]]
+
+
+    print(len(df[df['HomePlanet'].isna()]))
+    print(df[df['HomePlanet'].isna()]["Deck"])
+
+
+def missingValuesCryoSleep(df: DataFrame):
+    print("CryoSleep missing values : " + str(df["CryoSleep"].isna().sum()))
+    df.loc[(df["CryoSleep"].isna()) & (df["NoBill"] == 1), "CryoSleep"] = True
+    df.loc[(df["CryoSleep"].isna()) & (df["NoBill"] == 0), "CryoSleep"] = False
+    print("CryoSleep missing values : " + str(df["CryoSleep"].isna().sum()))
+
+def missingValueVIP(df: DataFrame):
+    print("VIP missing values : " + str(df["VIP"].isna().sum()))
+    df.loc[(df["VIP"].isna()), "VIP"] = False
+    print("VIP missing values : " + str(df["VIP"].isna().sum()))
+
+def missingValueSide(df: DataFrame):
+    missingSide = df.loc[(df["Side"].isna())]
+    print("Side missing values: ", df["Side"].isna().sum())
+    for index, row in missingSide.iterrows():
+        group = df.loc[(df["Group"]==row["Group"]), ["Side","Group"]]
+        side = group[~group["Side"].isna()].index
+        if len(side.values) > 0:
+            df.at[index, "Side"] = group["Side"][side.values[0]]
+    print("Side missing values: ", df["Side"].isna().sum())
+    missingSide = df.loc[(df["Side"].isna())]
+    for index, row in missingSide.iterrows():
+        group = df.loc[(df["Surname"] == row["Surname"]) & (df["Group_size"] > 1), np.array(["Side", "Surname"])]
+        side = group[~group["Side"].isna()].index
+        if len(side.values) > 0:
+            df.at[index, "Side"] = group["Side"][side.values[0]]
+    print("Side missing values: ", df["Side"].isna().sum())
+'''
+def replaceSpaces(df):
+    df.columns = df.columns.str.replace(' ', '_')
+    return df
+'''
 
 def createLuxeBasic(df: DataFrame):
     #showBillWithTransported()
     df["Luxury"] = df["RoomService"] + df["Spa"] + df["VRDeck"]
     df["Basics"] = df["ShoppingMall"] + df["FoodCourt"]
 
-    corr_l = df["Luxury"].corr(df["Transported"])
+    """corr_l = df["Luxury"].corr(df["Transported"])
     corr_b = df["Basics"].corr(df["Transported"])
     print("Correlation entre Luxury et transported : " + str(corr_l))
-    print("Correlation entre Basics et transported : " + str(corr_b))
+    print("Correlation entre Basics et transported : " + str(corr_b))"""
 
 def createNoBill(df: DataFrame):
-    df["NoBill"] = (df[["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]].sum(axis=1) == 0).astype('int64')
-    print(df.head())
+    df["NoBill"] = (df[["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]].sum(axis=1) == 0).astype(int)
+    """print(df.head())
     sns.countplot(data=df, x="NoBill", hue="Transported")
     plt.title("Nombre de personne transporté en fonction de si ils ont dépensé")
     plt.show()
-    print(df["NoBill"].corr(df["Transported"]))
+    print(df["NoBill"].corr(df["Transported"]))"""
 
 
 def createSolo(df: DataFrame):
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
     df["Group_size"] = df["Group"].map(lambda x: df["Group"].value_counts()[x])
-    print(df["Group_size"].corr(df['Transported']))
+    """print(df["Group_size"].corr(df['Transported']))
     sns.countplot(data=df, x="Group_size", hue="Transported")
     plt.title("Nombre de personne transporté en fonction de la taille de leur groupe")
-    # plt.show()
+    # plt.show()"""
 
-    df["Solo"] = df["Group_size"] == 1
-    print(df["Solo"].corr(df['Transported']))
+    df["Solo"] = (df["Group_size"] == 1).astype(int)
+    """print(df["Solo"].corr(df['Transported']))
     sns.countplot(data=df, x="Solo", hue="Transported")
     plt.title("Nombre personne voyagant seul transporté")
-    plt.show()
+    plt.show()"""
 
 
 def studyMissingValuesVIP(df: DataFrame):
@@ -186,13 +257,10 @@ def studyMissingValuesVIP(df: DataFrame):
 
 
 def studyMissingValuesSide(df: DataFrame):
-    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
-
     groupSide = (df.groupby(["Group", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
-    print("Nombre max de side par groupe : " + str(groupSide.max()))
-    sns.countplot(data=groupSide)
-    plt.title("Nombre de Side par groupe")
+    surnameSide = (df[df["Group_size"] > 1].groupby(["Surname", "Side"])["Side"].size().unstack().fillna(0) > 0)
+    sns.histplot(surnameSide.sum(axis=1), kde=False, bins=40)
+    plt.title("Nombre de Side par Surname")
     plt.show()
 
 
@@ -249,7 +317,8 @@ def studyMissingValuesHomePlanet(df: DataFrame):
 
 def missingValues(df):
     missingValuesHomePlanet(df)
-
+    missingValuesBill(df)
+    missingValuesCryoSleep(df)
 
 def studyMissingValues(df: DataFrame):
     df = df.copy(deep=True)
@@ -259,33 +328,37 @@ def studyMissingValues(df: DataFrame):
     # studyMissingValuesSide(df)
     studyMissingValuesVIP(df)
 
-
-def separateColumns(df: DataFrame):
-    # Split la colonne cabin en les colonnes Deck, Num et Side
-    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
-
+def createDummies(df: DataFrame):
     # planetes
     homePlanete = pd.get_dummies(df["HomePlanet"])
     df.drop("HomePlanet", axis=1, inplace=True)
 
+    # Side
     sides = pd.get_dummies(df["Side"])
     df.drop("Side", axis=1, inplace=True)
 
     destination = pd.get_dummies(df["Destination"])
     df.drop("Destination", axis=1, inplace=True)
 
+    return [homePlanete, sides, destination]
+
+def separateColumns(df: DataFrame):
+    # Split la colonne cabin en les colonnes Deck, Num et Side
+    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
     df.drop("Cabin", axis=1, inplace=True)
+
     # Split la colonne PassengerId en les colonnes Group et NbInGroup
     df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
     df.drop("PassengerId", axis=1, inplace=True)
     df.drop("NbInGroup", axis=1, inplace=True)
 
+    df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
     df.drop("Name", axis=1, inplace=True)
 
 
 def preprocessing(df):
     # Initialise les colones numeriques et nominales
-    numerical = df.select_dtypes("float64", None)
+    """numerical = df.select_dtypes("float64", None)
     nominal = df.select_dtypes("object", None)
 
     # On remplace les données manquantes numériques
@@ -299,12 +372,6 @@ def preprocessing(df):
     numerical["VRDeck"] = SimpleImputer(strategy="constant", fill_value=0).fit_transform(numerical[["VRDeck"]])
 
     # Creation des tranches d'ages en fonction du graphe obtenu
-    """numerical["Age_group"] = np.nan
-    numerical.loc[(numerical['Age'] >= 0) & (numerical['Age'] <= 5), "Age_group"] = 0
-    numerical.loc[(numerical['Age'] >= 6) & (numerical['Age'] <= 12), "Age_group"] = 1
-    numerical.loc[(numerical['Age'] >= 13) & (numerical['Age'] <= 18), "Age_group"] = 2
-    numerical.loc[(numerical['Age'] >= 19) & (numerical['Age'] <= 60), "Age_group"] = 3
-    numerical.loc[(numerical['Age'] >= 61), "Age_group"] = 4"""
     findAgeIntervals(train)
 
     numerical.drop("Age", axis=1, inplace=True)
@@ -334,12 +401,14 @@ def preprocessing(df):
     for column in newDf:
         newDf[column] = MinMaxScaler().fit_transform(np.array(newDf[column]).reshape(-1, 1))
     return newDf
-
+"""
 
 # Random forest feature importante
 def randomForest():
     print("feur")
 
+def xGBoost():
+    print("xgboost")
 
 def SVM(train_process, test_process, y):
     # Spécification des paramètres de la grille de recherche
@@ -386,8 +455,21 @@ showBillWithTransported()
 showBillWithCryo()
 showVIPWithTransported()"""
 
+
 # studyMissingValues(train)
-createLuxeBasic(train.copy())
+separateColumns(train)
+"""
+createNoBill(train)
+
+createLuxeBasic(train)
+missingValuesCryoSleep(train)
+missingValuesBill(train)
+missingValueVIP(train)
+"""
+createSolo(train)
+missingValueSide(train)
+missingValuesHomePlanet(train)
+
 """
 train_process = preprocessing(train)
 
