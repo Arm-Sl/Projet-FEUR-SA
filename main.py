@@ -215,6 +215,17 @@ def missingValueSide(df: DataFrame):
     df.loc[(df["Side"].isna()), "Side"] = "P"
     print("Side missing values: ", df["Side"].isna().sum())
 
+def missingValueDestination(df: DataFrame):
+    missingDestination = df.loc[(df["Destination"].isna())]
+    print("Destination missing values: ", df["Destination"].isna().sum())
+    for index, row in missingDestination.iterrows():
+        group = df.loc[(df["Group"]==row["Group"]), ["Destination","Group"]]
+        side = group[~group["Destination"].isna()].index
+        if len(side.values) > 0:
+            df.at[index, "Destination"] = group["Destination"][side.values[0]]
+    print("Destination missing values: ", df["Destination"].isna().sum())
+    df.loc[(df["Destination"].isna()), "Destination"] = "TRAPPIST-1e"
+    print("Destination missing values: ", df["Destination"].isna().sum())
 
 def createLuxeBasic(df: DataFrame):
     #showBillWithTransported()
@@ -291,13 +302,21 @@ def studyMissingValuesDeck(df: DataFrame):
 
 def studyMissingValuesDestination(df: DataFrame):
     df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
-    destinationGroup = df.groupby(["Surname", "Destination"])["Destination"].size().unstack().fillna(0)
-    sns.heatmap(destinationGroup, annot=True, fmt='g', cmap='coolwarm')
+    destinationSurname = (df.groupby(["Surname", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
+   
+    sns.barplot(x=destinationSurname.value_counts().index, y = destinationSurname.value_counts().values)
+    plt.title("Nombre de destination par Surname")
     plt.show()
 
     df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
     destinationDeck = df.groupby(["Deck", "Destination"])["Destination"].size().unstack().fillna(0)
     sns.heatmap(destinationDeck, annot=True, fmt='g', cmap='coolwarm')
+    plt.show()
+
+    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
+    destinationGroup = (df.groupby(["Group", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
+    sns.barplot(x=destinationGroup.value_counts().index, y = destinationGroup.value_counts().values)
+    plt.title("Nombre de destination par Groupe")
     plt.show()
 
     sns.countplot(df, x="Destination", hue="Transported")
@@ -472,16 +491,16 @@ showVIPWithTransported()"""
 separateColumns(train)
 """
 createNoBill(train)
-
+createSolo(train)
 createLuxeBasic(train)
 missingValuesCryoSleep(train)
 missingValuesBill(train)
 missingValueVIP(train)
 """
-createSolo(train)
-missingValueSide(train)
+missingValueDestination(train)
+#missingValueSide(train)
 #missingValuesHomePlanet(train)
-#studyMissingValuesSide(train)
+
 
 """
 train_process = preprocessing(train)
