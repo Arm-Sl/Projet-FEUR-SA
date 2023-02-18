@@ -69,9 +69,6 @@ def findAgeIntervals(train):
     print(abs(s["Age"].corr(s["Transported"])) - abs(s2["Age"].corr(s2["Transported"])))
 
     return liste
-    
-
-
 
 # Graphiques
 def graph(data, x, y, type="strip"):
@@ -107,7 +104,6 @@ def showBillWithTransported():
         plt.ylim([0,2000])
         ax.set_title(name)
         plt.subplots_adjust(hspace=0.5)
-    #fig.tight_layout()
     plt.show()
 
 def showDeckTransported():
@@ -134,10 +130,10 @@ def showAgeWithTransported():
 
 def missingValuesBill(df: DataFrame):
     bill = np.array(["RoomService", "Spa", "ShoppingMall", "VRDeck", "FoodCourt"])
-    print("Bill missing values :",df[bill].isna().sum().sum())
+    print("Bill missing values :", df[bill].isna().sum().sum())
     for b in bill:
-        df.loc[(df[b].isna()) & (df['CryoSleep'] == True), b] = 0
-    print("Bill missing values :",df[bill].isna().sum().sum())
+        df.loc[(df[b].isna()) & (df['CryoSleep'] is True), b] = 0
+    print("Bill missing values :", df[bill].isna().sum().sum())
 
     for b in bill:
         df.loc[(df[b].isna()), b] = df[b].median()
@@ -150,29 +146,27 @@ def missingValuesBill(df: DataFrame):
     df["Basics"] = df["ShoppingMall"] + df["FoodCourt"]
 
 def missingValuesHomePlanet(df: DataFrame):
-    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :", len(df[df['HomePlanet'].isna()]))
     linesMissingHomePlanet = df[df['HomePlanet'].isna()]
 
     for index, row in linesMissingHomePlanet.iterrows():
-        group = df.loc[df["Group"] == row["Group"], ["HomePlanet", "Group"]]
+        group = df.loc[df["Group"] == row["Group"], np.array(["HomePlanet", "Group"])]
         homeplanet = group[~group["HomePlanet"].isna()].index
-        if(len(homeplanet.values) > 0):
+        if len(homeplanet.values) > 0:
             df.at[index, "HomePlanet"] = group["HomePlanet"][homeplanet.values[0]]
 
-    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :", len(df[df['HomePlanet'].isna()]))
 
     linesMissingHomePlanet = df[df['HomePlanet'].isna()]
 
     for index, row in linesMissingHomePlanet.iterrows():
-        surname = df.loc[df["Surname"] == row["Surname"], ["HomePlanet", "Surname"]]
+        surname = df.loc[df["Surname"] == row["Surname"], np.array(["HomePlanet", "Surname"])]
         homeplanet = surname[~surname["HomePlanet"].isna()].index
-        if(len(homeplanet.values) > 0):
-            if(index == 5371):
+        if len(homeplanet.values) > 0:
+            if index == 5371:
                 print(homeplanet.values)
             df.at[index, "HomePlanet"] = surname["HomePlanet"][homeplanet.values[0]]
-
-
-    print("HomePlanet missing values :",len(df[df['HomePlanet'].isna()]))
+    print("HomePlanet missing values :", len(df[df['HomePlanet'].isna()]))
     print(df[df['HomePlanet'].isna()]["Deck"])
 
 
@@ -191,7 +185,7 @@ def missingValueSide(df: DataFrame):
     missingSide = df.loc[(df["Side"].isna())]
     print("Side missing values: ", df["Side"].isna().sum())
     for index, row in missingSide.iterrows():
-        group = df.loc[(df["Group"]==row["Group"]), ["Side","Group"]]
+        group = df.loc[(df["Group"] == row["Group"]), np.array(["Side","Group"])]
         side = group[~group["Side"].isna()].index
         if len(side.values) > 0:
             df.at[index, "Side"] = group["Side"][side.values[0]]
@@ -213,13 +207,28 @@ def missingValueDestination(df: DataFrame):
     missingDestination = df.loc[(df["Destination"].isna())]
     print("Destination missing values: ", df["Destination"].isna().sum())
     for index, row in missingDestination.iterrows():
-        group = df.loc[(df["Group"]==row["Group"]), ["Destination","Group"]]
+        group = df.loc[(df["Group"] == row["Group"]), np.array(["Destination","Group"])]
         side = group[~group["Destination"].isna()].index
         if len(side.values) > 0:
             df.at[index, "Destination"] = group["Destination"][side.values[0]]
     print("Destination missing values: ", df["Destination"].isna().sum())
     df.loc[(df["Destination"].isna()), "Destination"] = "TRAPPIST-1e"
     print("Destination missing values: ", df["Destination"].isna().sum())
+
+def missingValueDeck(df: DataFrame):
+    missingDeck = df.loc[(df["Deck"].isna())]
+    print("Deck missing values: ", df["Deck"].isna().sum())
+    for index, row in missingDeck.iterrows():
+        group = df.loc[(df["Group"] == row["Group"]), np.array(["Deck", "Group"])]
+        side = group[~group["Deck"].isna()].index
+        if len(side.values) > 0:
+            df.at[index, "Deck"] = group["Deck"].value_counts().index[0]
+    print("Deck missing values: ", df["Deck"].isna().sum())
+    df.loc[(df["Deck"].isna()) & (df["HomePlanet"] == "Earth"), "Deck"] = "G"
+    df.loc[(df["Deck"].isna()) & (df["HomePlanet"] == "Mars"), "Deck"] = "F"
+    df.loc[(df["Deck"].isna()) & (df["HomePlanet"] == "Europa") & (df["Solo"] == 1), "Deck"] = "C"
+    df.loc[(df["Deck"].isna()) & (df["HomePlanet"] == "Europa") & (df["Solo"] == 0), "Deck"] = "B"
+    print("Deck missing values: ", df["Deck"].isna().sum())
 
 def createAgeGroup(df: DataFrame):
     print("Age missing values: ", df["Age"].isna().sum())
@@ -278,12 +287,11 @@ def studyMissingValuesSide(df: DataFrame):
     surnameSide = (df[df["Group_size"] > 1].groupby(["Surname", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
     sideSolo = df[df["Solo"] == 1]
 
-    sns.barplot(x=groupSide.value_counts().index, y = groupSide.value_counts().values)
+    sns.barplot(x=groupSide.value_counts().index, y=groupSide.value_counts().values)
     plt.title("Nombre de Side par Groupe")
     plt.show()
 
-   
-    sns.barplot(x=surnameSide.value_counts().index, y = surnameSide.value_counts().values)
+    sns.barplot(x=surnameSide.value_counts().index, y=surnameSide.value_counts().values)
     plt.title("Nombre de Side par Surname")
     plt.show()
 
@@ -295,6 +303,8 @@ def studyMissingValuesSide(df: DataFrame):
 def studyMissingValuesDeck(df: DataFrame):
     df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
     df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
+    df[["FirstName", "Surname"]] = df["Name"].str.split(" ", expand=True)
+    createSolo(df)
 
     deckDestination = df.groupby(["Destination", "Deck"])["Deck"].size().unstack().fillna(0)
     sns.heatmap(deckDestination, annot=True, fmt='g', cmap='coolwarm')
@@ -304,12 +314,26 @@ def studyMissingValuesDeck(df: DataFrame):
     sns.heatmap(deckHomePlanet, annot=True, fmt='g', cmap='coolwarm')
     plt.show()
 
+    deckGroup = (df.groupby(["Group", "Deck"])["Deck"].size().unstack().fillna(0) > 0).sum(axis=1)
+    sns.barplot(x=deckGroup.value_counts().index, y=deckGroup.value_counts().values)
+    plt.title("Nombre de deck par groupe")
+    plt.show()
+
+    surnameGroup = (df.groupby(["Surname", "Deck"])["Deck"].size().unstack().fillna(0) > 0).sum(axis=1)
+    sns.barplot(x=surnameGroup.value_counts().index, y=surnameGroup.value_counts().values)
+    plt.title("Nombre de deck par Surname")
+    plt.show()
+
+    SoloGroup = df.groupby(["HomePlanet", "Solo", "Deck"])["Deck"].size().unstack().fillna(0)
+    sns.heatmap(SoloGroup, annot=True, fmt='g', cmap='coolwarm')
+    plt.show()
+
 
 def studyMissingValuesDestination(df: DataFrame):
     df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
     destinationSurname = (df.groupby(["Surname", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
    
-    sns.barplot(x=destinationSurname.value_counts().index, y = destinationSurname.value_counts().values)
+    sns.barplot(x=destinationSurname.value_counts().index, y=destinationSurname.value_counts().values)
     plt.title("Nombre de destination par Surname")
     plt.show()
 
@@ -358,6 +382,7 @@ def missingValues(df):
     missingValueDestination(df)
     missingValueSide(df)
     missingValueVIP(df)
+    missingValuesCryoSleep(df)
 
 def studyMissingValues(df: DataFrame):
     df = df.copy(deep=True)
@@ -403,6 +428,7 @@ def preprocessing(df):
     createAgeGroup(df)
     missingValues(df)
     print(df.info())
+    print(df.head())
     # Initialise les colones numeriques et nominales
     """
     newDf = pd.concat([numerical, nominal, homePlanete, destination, sides], axis=1)
@@ -458,9 +484,12 @@ def Logistic(train_process, test_process, y):
     submit.to_csv("./Data/submit.csv", index=False)
 
 
-train_process = preprocessing(train.copy())
-test_process = preprocessing(test.copy())
+#train_process = preprocessing(train.copy())
+#test_process = preprocessing(test.copy())
 
+separateColumns(train)
+createSolo(train)
+missingValueDeck(train)
 """
 #graph(train_process, "Transported", "l_needs")
 test_process = preprocessing(test)
