@@ -375,14 +375,14 @@ def studyMissingValuesHomePlanet(df: DataFrame):
     plt.show()
 
 
-def missingValues(df):
+def missingValues(df: DataFrame):
     missingValuesHomePlanet(df)
     missingValuesBill(df)
     missingValuesCryoSleep(df)
     missingValueDestination(df)
     missingValueSide(df)
     missingValueVIP(df)
-    missingValuesCryoSleep(df)
+    missingValueDeck(df)
 
 def studyMissingValues(df: DataFrame):
     df = df.copy(deep=True)
@@ -401,15 +401,21 @@ def createDummies(df: DataFrame):
     sides = pd.get_dummies(df["Side"])
     df.drop("Side", axis=1, inplace=True)
 
+    # Destination
     destination = pd.get_dummies(df["Destination"])
     df.drop("Destination", axis=1, inplace=True)
 
-    return [homePlanete, sides, destination]
+    # Deck
+    deck = pd.get_dummies(df["Deck"])
+    df.drop("Deck", axis=1, inplace=True)
+
+    return [homePlanete, sides, destination, deck]
 
 def separateColumns(df: DataFrame):
     # Split la colonne cabin en les colonnes Deck, Num et Side
     df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
     df.drop("Cabin", axis=1, inplace=True)
+    df.drop("Num", axis=1, inplace=True)
 
     # Split la colonne PassengerId en les colonnes Group et NbInGroup
     df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
@@ -419,6 +425,9 @@ def separateColumns(df: DataFrame):
     df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
     df.drop("Name", axis=1, inplace=True)
 
+def handleCategorical(df: DataFrame):
+    df["VIP"], uniques = pd.factorize(df["VIP"])
+    df["CryoSleep"], uniques = pd.factorize(df["CryoSleep"])
 
 def preprocessing(df):
     separateColumns(df)
@@ -427,16 +436,18 @@ def preprocessing(df):
     createLuxeBasic(df)
     createAgeGroup(df)
     missingValues(df)
-    print(df.info())
-    print(df.head())
-    # Initialise les colones numeriques et nominales
-    """
-    newDf = pd.concat([numerical, nominal, homePlanete, destination, sides], axis=1)
+    handleCategorical(df)
+    homePlanete, sides, destination, deck = createDummies(df)
+    df.drop("Group", axis=1, inplace=True)
+    df.drop("FirstName", axis=1, inplace=True)
+    df.drop("Surname", axis=1, inplace=True)
+    df.drop("Group_size", axis=1, inplace=True)
+    df.drop("Age", axis=1, inplace=True)
+    preproDf = pd.concat([df, homePlanete, destination, sides, deck], axis=1)
     # Normalise les données
-    for column in newDf:
-        newDf[column] = MinMaxScaler().fit_transform(np.array(newDf[column]).reshape(-1, 1))
-    return newDf
-    """
+    for column in preproDf:
+        preproDf[column] = MinMaxScaler().fit_transform(np.array(preproDf[column]).reshape(-1, 1))
+    return preproDf
 
 # Random forest feature importante
 def randomForest():
@@ -472,7 +483,7 @@ def Logistic(train_process, test_process, y):
                   'solver': ['saga', 'liblinear'],
                   'max_iter': [100, 1000, 10000, 100000]
                   }
-    Search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=1).fit(
+    Search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=0).fit(
         train_process, y)
 
     log_model = LogisticRegression(penalty=Search.best_params_["penalty"], C=Search.best_params_["C"],
@@ -480,19 +491,12 @@ def Logistic(train_process, test_process, y):
     log_model.fit(train_process, y)
     pred_train = log_model.predict(test_process)
 
-    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_train})
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_train.astype(bool)})
     submit.to_csv("./Data/submit.csv", index=False)
 
 
-#train_process = preprocessing(train.copy())
-#test_process = preprocessing(test.copy())
-
-separateColumns(train)
-createSolo(train)
-missingValueDeck(train)
-"""
-#graph(train_process, "Transported", "l_needs")
-test_process = preprocessing(test)
-y = train["Transported"]
-
-Logistic(train_process, test_process, y)"""
+y = train["Transported"].copy().astype(int)
+train_process = preprocessing(train.copy())
+train_process.drop("Transported", axis=1, inplace=True)
+test_process = preprocessing(test.copy())
+Logistic(train_process, test_process, y)
