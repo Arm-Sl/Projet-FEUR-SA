@@ -1,16 +1,23 @@
 import matplotlib
 import pandas as pd
 from pandas import DataFrame
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import normalize
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, KFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, normalize
 from sklearn.svm import SVC
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from typing import *
 import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import cross_validate
+import xgboost as xgb
 
 matplotlib.use('tkagg')
 
@@ -450,13 +457,40 @@ def preprocessing(df):
     return preproDf
 
 # Random forest feature importante
-def randomForest():
-    print("feur")
+def randomForest(train_process, test_process, y):
+    parameters = { 
+        'n_estimators': [200, 500],
+        'max_features': ['sqrt', 'log2'],
+        'max_depth' : [4,5,6,7,8],
+        'criterion' :['gini', 'entropy']
+    }
+    rfc = RandomForestClassifier(random_state=42)
+    search = GridSearchCV(estimator=rfc, param_grid=parameters, cv=5, scoring="f1", verbose=0).fit(train_process, y)
+    model = search.best_estimator_
+    #cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    #print(cv_results)
+    pred_trans = model.predict(test_process)
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
+    submit.to_csv("./Data/submit.csv", index=False)
 
-def xGBoost():
-    print("xgboost")
+def xGBoost(train_process, test_process, y):
+    print("########  XGBOOST ########")
+    boosted_grid = {
+        'n_estimators': [50, 100, 150, 200],
+        'max_depth': [4, 8, 12],
+        'learning_rate': [0.05, 0.1, 0.15]
+        }
+    booster = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss')
+    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(train_process, y)
+    model = search.best_estimator_
+    cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    print(cv_results)
+    """pred_trans = model.predict(test_process)
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
+    submit.to_csv("./Data/submit.csv", index=False)"""
 
 def SVM(train_process, test_process, y):
+    print("########  SVM ########")
     # Spécification des paramètres de la grille de recherche
     parameters = {
         'kernel': ['linear', 'rbf'],
@@ -465,38 +499,41 @@ def SVM(train_process, test_process, y):
     }
 
     # Recherche des meilleurs paramètres
-    search = GridSearchCV(SVC(), parameters, refit=True, verbose=3).fit(train_process, y)
-
+    search = GridSearchCV(estimator = SVC(), param_grid = parameters, scoring="f1", refit=True, verbose=0).fit(train_process, y)
+    model = search.best_estimator_
     # Entraînement du modèle avec les meilleurs paramètres
-    svc_best = SVC(**search.best_params_)
-    svc_best.fit(train_process, y)
-
+    #model.fit(train_process, y)
+    cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    print(cv_results)
     # Prédiction des étiquettes pour les données de test
-    pred_train = svc_best.predict(test_process)
-    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_train})
-    submit.to_csv("./Data/submit.csv", index=False)
+    """pred_trans = model.predict(test_process)
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
+    submit.to_csv("./Data/submit.csv", index=False)"""
 
 
 def Logistic(train_process, test_process, y):
-    parameters = {'penalty': ['l1', 'l2'],
-                  'C': [0.1, 1, 10, 100],
-                  'solver': ['saga', 'liblinear'],
-                  'max_iter': [100, 1000, 10000, 100000]
-                  }
-    Search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=0).fit(
-        train_process, y)
+    print("########  LOGISTIC ########")
+    parameters = {  'penalty': ['l1','l2'],
+                    'C': np.logspace(-3,3,7),
+                    'solver': ['saga', 'liblinear'],
+                    "max_iter": [1000, 10000, 100000]
+                }
+    search = GridSearchCV(LogisticRegression(), parameters, scoring='f1', n_jobs=-1, cv=5, verbose=0).fit(train_process, y)
+    model = search.best_estimator_
+    cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    print(cv_results)
+    #model.fit(train_process, y)                                                                                                                    
+    """pred_trans = model.predict(test_process)
 
-    log_model = LogisticRegression(penalty=Search.best_params_["penalty"], C=Search.best_params_["C"],
-                                   max_iter=Search.best_params_["max_iter"], solver=Search.best_params_["solver"])
-    log_model.fit(train_process, y)
-    pred_train = log_model.predict(test_process)
-
-    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_train.astype(bool)})
-    submit.to_csv("./Data/submit.csv", index=False)
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
+    submit.to_csv("./Data/submit.csv", index=False)"""
 
 
 y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
 train_process.drop("Transported", axis=1, inplace=True)
 test_process = preprocessing(test.copy())
-Logistic(train_process, test_process, y)
+#Logistic(train_process, test_process, y)
+#SVM(train_process, test_process, y)
+#xGBoost(train_process, test_process, y)
+randomForest(train_process, test_process, y)
