@@ -27,16 +27,11 @@ train = pd.read_csv('./Data/train.csv')
 test = pd.read_csv('./Data/test.csv')
 
 
-# etudier les correlations
-# imputer les données en fonction des groupes
-# TODO faire des categories d'ages
-# TODO faire dummy pour deck
-# TODO drop les ligne avec 2 valeurs nan ou plus
-# TODO meme groupe viennent meme planete
-# TODO regarder si passager seul ou en famille plus sauvé si oui ajouter une colonne seul/famille
-# TODO regarder les decks
-# TODO matrice de confusion,
-# TODO regarder importance des variables
+# TODO regarder importance des variables avec regression logistique et randomforest
+# TODO SVM
+# TODO tuner boosting
+# TODO comparer accuracy sans tuner et avec
+# TODO calculer moyenne et variance sur 5 itérations du modele
 
 
 
@@ -127,7 +122,7 @@ def showBillWithTransported():
 
 def showDeckTransported():
     trainC = train.copy()
-    trainC[["Deck", "Num", "Side"]] = trainC["Cabin"].str.split('/', expand=True)
+    trainC[np.array(["Deck", "Num", "Side"])] = trainC["Cabin"].str.split('/', expand=True)
     trainC.drop("Cabin", axis=1, inplace=True)
     fig = plt.figure(figsize=(10, 20))
     ax = fig.add_subplot(5, 2, 1)
@@ -271,7 +266,7 @@ def createLuxeBasic(df: DataFrame):
     print("Correlation entre Basics et transported : " + str(corr_b))"""
 
 def createNoBill(df: DataFrame):
-    df["NoBill"] = (df[["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]].sum(axis=1) == 0).astype(int)
+    df["NoBill"] = (df[np.array(["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"])].sum(axis=1) == 0).astype(int)
     """print(df.head())
     sns.countplot(data=df, x="NoBill", hue="Transported")
     plt.title("Nombre de personne transporté en fonction de si ils ont dépensé")
@@ -320,9 +315,9 @@ def studyMissingValuesSide(df: DataFrame):
 
 
 def studyMissingValuesDeck(df: DataFrame):
-    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
-    df[["FirstName", "Surname"]] = df["Name"].str.split(" ", expand=True)
+    df[np.array(["Deck", "Num", "Side"])] = df["Cabin"].str.split('/', expand=True)
+    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
+    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(" ", expand=True)
     createSolo(df)
 
     deckDestination = df.groupby(["Destination", "Deck"])["Deck"].size().unstack().fillna(0)
@@ -349,19 +344,19 @@ def studyMissingValuesDeck(df: DataFrame):
 
 
 def studyMissingValuesDestination(df: DataFrame):
-    df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
+    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(' ', expand=True)
     destinationSurname = (df.groupby(["Surname", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
    
     sns.barplot(x=destinationSurname.value_counts().index, y=destinationSurname.value_counts().values)
     plt.title("Nombre de destination par Surname")
     plt.show()
 
-    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
+    df[np.array(["Deck", "Num", "Side"])] = df["Cabin"].str.split('/', expand=True)
     destinationDeck = df.groupby(["Deck", "Destination"])["Destination"].size().unstack().fillna(0)
     sns.heatmap(destinationDeck, annot=True, fmt='g', cmap='coolwarm')
     plt.show()
 
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
+    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
     destinationGroup = (df.groupby(["Group", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
     sns.barplot(x=destinationGroup.value_counts().index, y = destinationGroup.value_counts().values)
     plt.title("Nombre de destination par Groupe")
@@ -372,7 +367,7 @@ def studyMissingValuesDestination(df: DataFrame):
 
 
 def studyMissingValuesHomePlanet(df: DataFrame):
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
+    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
 
     homePlanetGroup = df.groupby(["Group", "HomePlanet"])
     nombreDeHomePlanetDifferentesParGroupe = (homePlanetGroup["HomePlanet"].size().unstack().fillna(0) > 0).sum(axis=1)
@@ -382,7 +377,7 @@ def studyMissingValuesHomePlanet(df: DataFrame):
     plt.title('Nombre de HomePlanet par Group')
     plt.show()
 
-    df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
+    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(' ', expand=True)
 
     homePlanetSurname = df.groupby(["Surname", "HomePlanet"])
     nombreDeHomePlanetDifferentesParSurname = (homePlanetSurname["Surname"].size().unstack().fillna(0) > 0).sum(axis=1)
@@ -432,16 +427,16 @@ def createDummies(df: DataFrame):
 
 def separateColumns(df: DataFrame):
     # Split la colonne cabin en les colonnes Deck, Num et Side
-    df[["Deck", "Num", "Side"]] = df["Cabin"].str.split('/', expand=True)
+    df[np.array(["Deck", "Num", "Side"])] = df["Cabin"].str.split('/', expand=True)
     df.drop("Cabin", axis=1, inplace=True)
     df.drop("Num", axis=1, inplace=True)
 
     # Split la colonne PassengerId en les colonnes Group et NbInGroup
-    df[["Group", "NbInGroup"]] = df["PassengerId"].str.split('_', expand=True)
+    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
     df.drop("PassengerId", axis=1, inplace=True)
     df.drop("NbInGroup", axis=1, inplace=True)
 
-    df[["FirstName", "Surname"]] = df["Name"].str.split(' ', expand=True)
+    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(' ', expand=True)
     df.drop("Name", axis=1, inplace=True)
 
 def dropVip(df):
@@ -482,7 +477,7 @@ def preprocessing(df):
     return preproDf
 
 # Random forest feature importante
-def randomForest(train_process, test_process, y):
+def randomForest(train_process, y, test_process, nbrEssais = 1):
     print("########  RANDOMFOREST ########")
     parameters = { 
         'n_estimators': [200, 500],
@@ -490,16 +485,30 @@ def randomForest(train_process, test_process, y):
         'max_depth' : [4,5,6,7,8],
         'criterion' :['gini', 'entropy']
     }
+
+    """predictionsList = np.empty(nbrEssais)
+    for i in range(nbrEssais):
+        rfc = RandomForestClassifier(random_state=42)
+        search = GridSearchCV(estimator=rfc, param_grid=parameters, cv=5, scoring="f1", verbose=0).fit(X_train, y_train)
+        model = search.best_estimator_
+
+        predictionsList[i] = model.predict(X_train)
+    """
     rfc = RandomForestClassifier(random_state=42)
     search = GridSearchCV(estimator=rfc, param_grid=parameters, cv=5, scoring="f1", verbose=0).fit(train_process, y)
     model = search.best_estimator_
+    for i in range(model.n_features_in_):
+        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))
+    #model.predict(X_train)
+    #plt.show()
     #cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
     #print(cv_results)
-    pred_trans = model.predict(test_process)
-    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
-    submit.to_csv("./Data/submit.csv", index=False)
 
-def xGBoost(train_process, test_process, y):
+    """pred_trans = model.predict(test_process)
+    submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
+    submit.to_csv("./Data/submit.csv", index=False)"""
+
+def xGBoost(X_train, X_test, y_train, y_test, test_process):
     print("########  XGBOOST ########")
     boosted_grid = {
         'n_estimators': [50, 100, 150, 200],
@@ -507,15 +516,35 @@ def xGBoost(train_process, test_process, y):
         'learning_rate': [0.05, 0.1, 0.15]
         }
     booster = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss')
-    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(train_process, y)
+    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(X_train, y_train)
     model = search.best_estimator_
-    cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
-    print(cv_results)
+    """cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    print(cv_results)"""
+    model.fit(X_train, y_train)
+    """cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
+    print(cv_results)"""
+    predictions = model.predict(X_train)
+    print('Training Accuracy: {}'.format(accuracy_score(y_train, predictions)))
+    cross_val = StratifiedKFold(n_splits=10, random_state=1, shuffle=True)
+    scores = cross_val_score(model, X_train, y_train, scoring='f1', cv=cross_val, n_jobs=-1)
+
+    for index, score in enumerate(scores):
+        print('Iteration {} Accuracy score: {}'.format(index + 1, score))
+
+    print('\nMean Accuracy: {}'.format(np.mean(scores)))
+    testing_predictions = model.predict(X_test)
+
+    print(classification_report(y_test, testing_predictions))
+
+    cm = confusion_matrix(y_test, testing_predictions, labels=model.classes_)
+    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    display.plot()
+    #plt.show()
     """pred_trans = model.predict(test_process)
     submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
     submit.to_csv("./Data/submit.csv", index=False)"""
 
-def SVM(X_train, X_test, y_train, y_test):
+def SVM(train_process, y, test_process):
     print("########  SVM ########")
     # Spécification des paramètres de la grille de recherche
     parameters = {
@@ -525,68 +554,38 @@ def SVM(X_train, X_test, y_train, y_test):
     }
 
     # Recherche des meilleurs paramètres
-    search = GridSearchCV(estimator = SVC(), param_grid = parameters, scoring="f1", refit=True, verbose=0).fit(X_train, y_train)
-    model = search.best_estimator_
-    model.fit(X_train, y_train)
-    """cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
-    print(cv_results)"""
-    predictions = model.predict(X_train)
-    print('Training Accuracy: {}'.format(accuracy_score(y_train, predictions)))
-    cross_val = StratifiedKFold(n_splits=10, random_state=1, shuffle=True)
-    scores = cross_val_score(model, X_train, y_train, scoring='f1', cv=cross_val, n_jobs=-1)
-
-    for index, score in enumerate(scores):
-        print('Iteration {} Accuracy score: {}'.format(index + 1, score))
-
-    print('\nMean Accuracy: {}'.format(np.mean(scores)))
-    testing_predictions = model.predict(X_test)
-
-    print(classification_report(y_test, testing_predictions))
-
-    cm = confusion_matrix(y_test, testing_predictions, labels=model.classes_)
-    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
-    display.plot()
-    plt.show()
+    #search = GridSearchCV(estimator = SVC(), param_grid = parameters, scoring="f1", refit=True, verbose=0).fit(train_process, y)
+    #model = search.best_estimator_
+    model = SVC(random_state=0, probability=True)
+    model.fit(train_process, y)
+    #plt.show()
     # Entraînement du modèle avec les meilleurs paramètres
     #model.fit(train_process, y)
     """cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
     print(cv_results)"""
     # Prédiction des étiquettes pour les données de test
-    """pred_trans = model.predict(test_process)
+    pred_trans = model.predict(test_process)
     submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
-    submit.to_csv("./Data/submit.csv", index=False)"""
+    submit.to_csv("./Data/submit.csv", index=False)
 
 
-def Logistic(X_train, X_test, y_train, y_test):
+def Logistic(train_process, y, test_process):
     print("########  LOGISTIC ########")
-    parameters = {  'penalty': ['l1','l2'],
+    model = LogisticRegression()
+    model.fit(train_process, y)
+    #pred_trans = model.predict(test_proc
+
+    for i in range(model.n_features_in_):
+        print(model.feature_names_in_[i] + "  :  " + str(model.coef_[0][i]))
+    """parameters = {  'penalty': ['l1','l2'],
                     'C': np.logspace(-3,3,7),
                     'solver': ['saga', 'liblinear'],
-                    "max_iter": [100000, 1000000, 10000000]
+                    #"max_iter": [100000, 1000000, 10000000]
+                    "max_iter": [1000, 1000, 10000]
                 }
     search = GridSearchCV(LogisticRegression(), parameters, scoring='f1', n_jobs=-1, cv=5, verbose=0).fit(X_train, y_train)
     model = search.best_estimator_
-    model.fit(X_train, y_train)
-    """cv_results = cross_validate(model, train_process, y, scoring="f1", verbose=0)
-    print(cv_results)"""
-    predictions = model.predict(X_train)
-    print('Training Accuracy: {}'.format(accuracy_score(y_train, predictions)))
-    cross_val = StratifiedKFold(n_splits=10, random_state=1, shuffle=True)
-    scores = cross_val_score(model, X_train, y_train, scoring='f1', cv=cross_val, n_jobs=-1)
-
-    for index, score in enumerate(scores):
-        print('Iteration {} Accuracy score: {}'.format(index + 1, score))
-
-    print('\nMean Accuracy: {}'.format(np.mean(scores)))
-    testing_predictions = model.predict(X_test)
-
-    print(classification_report(y_test, testing_predictions))
-
-    cm = confusion_matrix(y_test, testing_predictions, labels=model.classes_)
-    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
-    display.plot()
-    plt.show()
-    #model.fit(train_process, y)                                                                                                                    
+    model.fit(X_train, y_train)"""
     """pred_trans = model.predict(test_process)
 
     submit = pd.DataFrame({'PassengerId': test["PassengerId"], 'Transported': pred_trans.astype(bool)})
@@ -595,18 +594,10 @@ def Logistic(X_train, X_test, y_train, y_test):
 
 y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
-list_corr = []
-for column in train_process.columns:
-    list_corr.append(abs(train_process[column].corr(train_process["Transported"])))
 train_process.drop("Transported", axis=1, inplace=True)
-
-#sns.heatmap(train_process.corrwith(y), xticklabels=True, yticklabels=True)
-#plt.show()
 print(train_process.corrwith(y).abs())
 test_process = preprocessing(test.copy())
-
-X_train, X_test, y_train, y_test = train_test_split(train_process, y, test_size=0.2, random_state=1)
-#Logistic(X_train, X_test, y_train, y_test)
-SVM(X_train, X_test, y_train, y_test)
-#xGBoost(train_process, test_process, y)
-#randomForest(train_process, test_process, y)
+Logistic(train_process, y, test_process)
+SVM(train_process, y, test_process)
+#xGBoost(X_train, X_test, y_train, y_test)
+#randomForest(train_process, y, test_process, nbrEssais=10)
