@@ -3,17 +3,18 @@ import pandas as pd
 from pandas import DataFrame
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, KFold, cross_val_score, StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, KFold, cross_val_score, StratifiedShuffleSplit, RandomizedSearchCV
 from sklearn.svm import SVC
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from typing import *
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import cross_validate
 from sklearn.feature_selection import RFE
 import xgboost as xgb
+from scipy.stats import randint, expon, reciprocal, uniform
 
 matplotlib.use('tkagg')
 
@@ -407,10 +408,6 @@ def createDummies(df: DataFrame):
     homePlanete = pd.get_dummies(df["HomePlanet"])
     df.drop("HomePlanet", axis=1, inplace=True)
 
-    # Side
-    sides = pd.get_dummies(df["Side"])
-    df.drop("Side", axis=1, inplace=True)
-
     # Destination
     destination = pd.get_dummies(df["Destination"])
     df.drop("Destination", axis=1, inplace=True)
@@ -419,7 +416,7 @@ def createDummies(df: DataFrame):
     deck = pd.get_dummies(df["Deck"])
     df.drop("Deck", axis=1, inplace=True)
 
-    return [homePlanete, sides, destination, deck]
+    return [homePlanete, destination, deck]
 
 def separateColumns(df: DataFrame):
     # Split la colonne cabin en les colonnes Deck, Num et Side
@@ -437,9 +434,11 @@ def separateColumns(df: DataFrame):
 
 def dropVip(df):
     df.drop("VIP", axis=1, inplace=True)
+
 def handleCategorical(df: DataFrame):
     df["VIP"], uniques = pd.factorize(df["VIP"])
     df["CryoSleep"], uniques = pd.factorize(df["CryoSleep"])
+    df["Side"], uniques = pd.factorize(df["Side"])
 
 def dropColumns(df: DataFrame):
     df.drop("Group", axis=1, inplace=True)
@@ -457,11 +456,12 @@ def preprocessing(df):
     missingValues(df)
     #dropRemainingMissingValues(df)
     handleCategorical(df)
-    homePlanete, sides, destination, deck = createDummies(df)
+    homePlanete, destination, deck = createDummies(df)
     dropColumns(df)
     dropVip(df)
-    preproDf = pd.concat([df, homePlanete, destination, sides, deck], axis=1)
-    return preproDf
+    preproDf = pd.concat([df, homePlanete, destination, deck], axis=1)
+    scaler = MinMaxScaler()
+    return pd.DataFrame(scaler.fit_transform(preproDf.values), columns=preproDf.columns, index=preproDf.index)
 
 # Random forest feature importante
 def randomForest(train_process, y, test_process):
@@ -483,8 +483,8 @@ def randomForest(train_process, y, test_process):
     # n_estimators: 200
     model = RandomForestClassifier(max_depth=8, criterion='entropy', max_features='sqrt', n_estimators=200)
     model.fit(train_process, y)
-    for i in range(model.n_features_in_):
-        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))
+    """for i in range(model.n_features_in_):
+        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))"""
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -513,27 +513,21 @@ def xGBoost(train_process, y, test_process):
 def SVM(train_process, y, test_process):
     print("########  SVM ########")
     ##### DETERMINATION MEILLEUR HYPERPARAMETRE #####
-    parameters = [  {'C':[1, 10, 100, 1000], 'kernel':['linear']},
-                    {'C':[1, 10, 100, 1000], 'kernel':['rbf'], 'gamma':[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
-                    {'C':[1, 10, 100, 1000], 'kernel':['poly'], 'degree': [2, 3, 4] ,'gamma':[0.01, 0.02, 0.03, 0.04, 0.05]} 
-                ]
-    """svc = SVC()
-    grid = GridSearchCV(estimator = svc,  
-                    param_grid = parameters,
-                    scoring = 'accuracy',
-                    cv = 5,
-                    verbose=2)
-    grid.fit(X_train, y_train)
+    """parameters = {
+        'C':[0.001, 0.01, 0.1, 1, 10, 100, 1000],
+        'kernel':['linear']
+    }
+    svc = SVC()
+    grid = GridSearchCV(estimator = svc, param_grid = parameters, scoring = 'accuracy', cv = 5, verbose=2, n_jobs=-1)
+    grid.fit(train_process, y)
     print('GridSearch CV best score : {:.4f}\n\n'.format(grid.best_score_))
     print('Parameters that give the best results :','\n\n', (grid.best_params_))
     print('\n\nEstimator that was chosen by the search :','\n\n', (grid.best_estimator_))"""
 
     #### MEILLEUR HYPERPARAMETRE #####
-    # C = 1000
-    # kernel = "poly"
-    # degree = 2
-    # gamma = 0.05
-    svc = SVC(C=1000, degree=2, gamma=0.05, kernel="poly", probability=True) 
+    # C = 1
+    # kernel = "linear"
+    svc = SVC(kernel="linear", C=1)
     svc.fit(train_process,y)
     pred = svc.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
@@ -543,25 +537,22 @@ def SVM(train_process, y, test_process):
 
 def Logistic(train_process, y, test_process):
     print("########  LOGISTIC ########")
-    """
-    parameters = {  'penalty': ['l1','l2'],
+    """parameters = {  'penalty': ['l1','l2'],
                     'C': np.logspace(-3,3,7),
                     'solver': ['saga', 'liblinear'],
                     "max_iter": [1000, 10000, 100000]
                 }
-    search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=2).fit(train_process, y)
-    model = search.best_estimator_
-    print(search.best_params_)
-    """
+    search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=0).fit(train_process, y)
+    model2 = search.best_estimator_
+    print(search.best_params_)"""
+    
     #### MEILLEUR HYPERPARAMETRE #####
     # C = 100
     # max_iter = 1000
     # penalty = l2
-    # solver = liblinear
-    model = LogisticRegression(C=100, max_iter=1000, penalty='l2', solver='liblinear')
-    selector = RFE(model, n_features_to_select=10, step=1).fit(train_process, y)
-    for i in range(selector.n_features_in_):
-        print(selector.feature_names_in_[i], selector.support_[i], selector.ranking_[i])
+    # solver = saga
+    
+    model = LogisticRegression(C=100, max_iter=1000, penalty='l2', solver='saga')
     model.fit(train_process, y)
     """for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.coef_[0][i]))"""
@@ -570,29 +561,28 @@ def Logistic(train_process, y, test_process):
     sub['Transported'] = pred.astype(bool)
     sub.to_csv("./Data/submit.csv", index=False)
 
-
+"""
 ##### PREPROCESSING DES DONNEES ######
-"""y = train["Transported"].copy().astype(int)
+y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
+train_process.columns = train_process.columns.astype(str)
 train_process.drop("Transported", axis=1, inplace=True)
 test_process = preprocessing(test.copy())
-
+test_process.columns = test_process.columns.astype(str)
+print(train_process.head())
 ##### NORMALISATION DES DONNEES #####
-cols_train = train_process.columns
-cols_test = test_process.columns
-scaler = MinMaxScaler()
-train_process = scaler.fit_transform(train_process)
-test_process = scaler.transform(test_process)
-train_process = pd.DataFrame(train_process, columns=[cols_train])
-test_process = pd.DataFrame(test_process, columns=[cols_test])
+
 train_process.to_csv("./Data/train_process.csv", index=False)
-test_process.to_csv("./Data/test_process.csv", index=False)"""
+test_process.to_csv("./Data/test_process.csv", index=False)
+"""
 
 y = train["Transported"].copy().astype(int)
 train_process = pd.read_csv('./Data/train_process.csv')
 test_process = pd.read_csv('./Data/test_process.csv')
-Logistic(train_process, y, test_process)
-#SVM(train_process, y, test_process)
+
+
+#Logistic(train_process, y, test_process)
+SVM(train_process, y, test_process)
 #xGBoost(train_process, y, test_process)
 #randomForest(train_process, y, test_process)
 
