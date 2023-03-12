@@ -29,11 +29,6 @@ test = pd.read_csv('./Data/test.csv')
 # TODO comparer accuracy sans tuner et avec
 # TODO calculer moyenne et variance sur 5 itérations du modele
 
-
-
-
-
-
 def dropRemainingMissingValues(train):
     print("Remaining missing values :  " + str(len(train[train.isna().sum(axis=1)>0])) + " / " + str(len(train)))
     train.drop(train[train.isna().sum(axis=1) > 0].index, inplace=True)
@@ -493,17 +488,20 @@ def randomForest(train_process, y, test_process):
 
 def xGBoost(train_process, y, test_process):
     print("########  XGBOOST ########")
-    """params = { 'max_depth': [3,6,10,12],
-          'gamma': [0,1],
-          'learning_rate': [0.01, 0.02, 0.05, 0.1],
-          'n_estimators': [100, 200, 500, 1000],
-          'colsample_bytree': [0.3, 0.5, 0.7]
+    params = {
+        "objective": ['reg:logistic'],
+        'max_depth': [3,6,8,10,12], 
+        'learning_rate':[0.01, 0.05, 0.1, 0.15],
+        'random_state':[20],
+        'n_estimators': [100, 250, 500, 750, 1000],
+        'colsample_bytree': [0.5, 0.7, 1]
     }
-    booster = xgb.XGBClassifier(objective= 'binary:logistic')
-    grid = GridSearchCV(estimator=booster, param_grid=params, n_jobs=-1, cv=5, verbose=2).fit(train_process, y)
-    model = grid.best_estimator_
-    print(grid.best_params_)"""
-    model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
+    #  Meilleur parametre {'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_depth': 6, 'n_estimators': 100, 'objective': 'reg:logistic', 'random_state': 20}
+    """grid = GridSearchCV(estimator=xgb.XGBClassifier(), param_grid=params, n_jobs=-1, cv=5, verbose=2, scoring='neg_mean_squared_error').fit(train_process, y)
+    print("Best parameters:", grid.best_params_)
+    print("Lowest RMSE: ", (-grid.best_score_)**(1/2.0))"""
+    #model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
+    model = xgb.XGBClassifier(colsample_bytree= 0.5, learning_rate=0.05, max_depth=6, n_estimators=100, objective='reg:logistic', random_state=20)
     model.fit(train_process, y)
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
@@ -582,7 +580,7 @@ test_process = pd.read_csv('./Data/test_process.csv')
 
 
 #Logistic(train_process, y, test_process)
-SVM(train_process, y, test_process)
-#xGBoost(train_process, y, test_process)
+#SVM(train_process, y, test_process)
+xGBoost(train_process, y, test_process)
 #randomForest(train_process, y, test_process)
 
