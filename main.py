@@ -403,6 +403,10 @@ def createDummies(df: DataFrame):
     homePlanete = pd.get_dummies(df["HomePlanet"])
     df.drop("HomePlanet", axis=1, inplace=True)
 
+    # Side
+    sides = pd.get_dummies(df["Side"])
+    df.drop("Side", axis=1, inplace=True)
+
     # Destination
     destination = pd.get_dummies(df["Destination"])
     df.drop("Destination", axis=1, inplace=True)
@@ -411,7 +415,7 @@ def createDummies(df: DataFrame):
     deck = pd.get_dummies(df["Deck"])
     df.drop("Deck", axis=1, inplace=True)
 
-    return [homePlanete, destination, deck]
+    return [homePlanete, sides, destination, deck]
 
 def separateColumns(df: DataFrame):
     # Split la colonne cabin en les colonnes Deck, Num et Side
@@ -433,7 +437,6 @@ def dropVip(df):
 def handleCategorical(df: DataFrame):
     df["VIP"], uniques = pd.factorize(df["VIP"])
     df["CryoSleep"], uniques = pd.factorize(df["CryoSleep"])
-    df["Side"], uniques = pd.factorize(df["Side"])
 
 def dropColumns(df: DataFrame):
     df.drop("Group", axis=1, inplace=True)
@@ -441,6 +444,12 @@ def dropColumns(df: DataFrame):
     df.drop("Surname", axis=1, inplace=True)
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
+
+    """df.drop("RoomService", axis=1, inplace=True)
+    df.drop("FoodCourt", axis=1, inplace=True)
+    df.drop("ShoppingMall", axis=1, inplace=True)
+    df.drop("Spa", axis=1, inplace=True)
+    df.drop("VRDeck", axis=1, inplace=True)"""
 
 def preprocessing(df):
     separateColumns(df)
@@ -451,12 +460,12 @@ def preprocessing(df):
     missingValues(df)
     #dropRemainingMissingValues(df)
     handleCategorical(df)
-    homePlanete, destination, deck = createDummies(df)
+    homePlanete, sides, destination, deck = createDummies(df)
     dropColumns(df)
-    dropVip(df)
-    preproDf = pd.concat([df, homePlanete, destination, deck], axis=1)
-    scaler = MinMaxScaler()
-    return pd.DataFrame(scaler.fit_transform(preproDf.values), columns=preproDf.columns, index=preproDf.index)
+    preproDf = pd.concat([df, homePlanete, destination, sides, deck], axis=1)
+    for column in preproDf:
+        preproDf[column] = MinMaxScaler().fit_transform(np.array(preproDf[column]).reshape(-1, 1))
+    return preproDf
 
 # Random forest feature importante
 def randomForest(train_process, y, test_process):
@@ -488,20 +497,26 @@ def randomForest(train_process, y, test_process):
 
 def xGBoost(train_process, y, test_process):
     print("########  XGBOOST ########")
-    params = {
-        "objective": ['reg:logistic'],
-        'max_depth': [3,6,8,10,12], 
-        'learning_rate':[0.01, 0.05, 0.1, 0.15],
-        'random_state':[20],
-        'n_estimators': [100, 250, 500, 750, 1000],
-        'colsample_bytree': [0.5, 0.7, 1]
-    }
-    #  Meilleur parametre {'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_depth': 6, 'n_estimators': 100, 'objective': 'reg:logistic', 'random_state': 20}
-    """grid = GridSearchCV(estimator=xgb.XGBClassifier(), param_grid=params, n_jobs=-1, cv=5, verbose=2, scoring='neg_mean_squared_error').fit(train_process, y)
-    print("Best parameters:", grid.best_params_)
-    print("Lowest RMSE: ", (-grid.best_score_)**(1/2.0))"""
-    #model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
-    model = xgb.XGBClassifier(colsample_bytree= 0.5, learning_rate=0.05, max_depth=6, n_estimators=100, objective='reg:logistic', random_state=20)
+    """boosted_grid = {
+        'n_estimators': [50, 100, 150, 200],
+        'max_depth': [4, 8, 12],
+        'learning_rate': [0.05, 0.1, 0.15]
+        }
+    booster = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss', random_state=0)
+    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(train_process, y)
+    model = search.best_estimator_
+
+    print(search.best_params_)
+    print(search.best_score_)"""
+    #### MEILLEUR HYPERPARAMETRE #####
+    # learning_rate =  0.05
+    # max_depth = 4
+    # n_estimators = 100
+    # booster = gbtree
+    # subsample = 0.5
+    # min_child_weight = 1
+    # gamma = 1
+    model = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss',random_state=0, learning_rate=0.05, max_depth=4, n_estimators=100, booster='gbtree', subsample=1, min_child_weight=1, gamma=1)
     model.fit(train_process, y)
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
@@ -563,12 +578,8 @@ def Logistic(train_process, y, test_process):
 ##### PREPROCESSING DES DONNEES ######
 y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
-train_process.columns = train_process.columns.astype(str)
 train_process.drop("Transported", axis=1, inplace=True)
 test_process = preprocessing(test.copy())
-test_process.columns = test_process.columns.astype(str)
-print(train_process.head())
-##### NORMALISATION DES DONNEES #####
 
 train_process.to_csv("./Data/train_process.csv", index=False)
 test_process.to_csv("./Data/test_process.csv", index=False)
