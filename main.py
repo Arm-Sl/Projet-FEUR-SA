@@ -444,12 +444,16 @@ def dropColumns(df: DataFrame):
     df.drop("Surname", axis=1, inplace=True)
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
-
-    """df.drop("RoomService", axis=1, inplace=True)
+    """
+    df.drop("RoomService", axis=1, inplace=True)
     df.drop("FoodCourt", axis=1, inplace=True)
     df.drop("ShoppingMall", axis=1, inplace=True)
     df.drop("Spa", axis=1, inplace=True)
     df.drop("VRDeck", axis=1, inplace=True)"""
+
+    #df.drop("NoBill", axis=1, inplace=True)
+    #df.drop("Solo", axis=1, inplace=True)
+    #df.drop("Age_group", axis=1, inplace=True)
 
 def preprocessing(df):
     separateColumns(df)
@@ -463,8 +467,8 @@ def preprocessing(df):
     homePlanete, sides, destination, deck = createDummies(df)
     dropColumns(df)
     preproDf = pd.concat([df, homePlanete, destination, sides, deck], axis=1)
-    for column in preproDf:
-        preproDf[column] = MinMaxScaler().fit_transform(np.array(preproDf[column]).reshape(-1, 1))
+    #for column in preproDf:
+    #    preproDf[column] = MinMaxScaler().fit_transform(np.array(preproDf[column]).reshape(-1, 1))
     return preproDf
 
 # Random forest feature importante
@@ -516,12 +520,15 @@ def xGBoost(train_process, y, test_process):
     # subsample = 0.5
     # min_child_weight = 1
     # gamma = 1
-    model = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss',random_state=0, learning_rate=0.05, max_depth=4, n_estimators=100, booster='gbtree', subsample=1, min_child_weight=1, gamma=1)
-    model.fit(train_process, y)
-    pred = model.predict(test_process)
-    sub = pd.read_csv("./Data/sample_submission.csv")
+    model = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss',random_state=0, learning_rate=0.05, 
+                              max_depth=7, n_estimators=90, booster='gbtree', subsample=1, min_child_weight=1, gamma=1.31,
+                              scale_pos_weight=1.01)
+    model.fit(X_train, y_train)
+    pred = model.predict(X_valid)
+    print(accuracy_score(y_valid, pred))
+    """sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
-    sub.to_csv("./Data/submit.csv", index=False)
+    sub.to_csv("./Data/submit.csv", index=False)"""
     
 def SVM(train_process, y, test_process):
     print("########  SVM ########")
@@ -574,21 +581,28 @@ def Logistic(train_process, y, test_process):
     sub['Transported'] = pred.astype(bool)
     sub.to_csv("./Data/submit.csv", index=False)
 
-"""
+
 ##### PREPROCESSING DES DONNEES ######
 y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
 train_process.drop("Transported", axis=1, inplace=True)
-test_process = preprocessing(test.copy())
-
-train_process.to_csv("./Data/train_process.csv", index=False)
-test_process.to_csv("./Data/test_process.csv", index=False)
 """
-
 y = train["Transported"].copy().astype(int)
 train_process = pd.read_csv('./Data/train_process.csv')
 test_process = pd.read_csv('./Data/test_process.csv')
+"""
 
+X_train, X_valid, y_train, y_valid = train_test_split(train_process, y, test_size=0.3, random_state=42)
+
+for column in X_train:
+    X_train[column] = MinMaxScaler().fit_transform(np.array(X_train[column]).reshape(-1, 1))
+
+for column in X_valid:
+    X_valid[column] = MinMaxScaler().fit_transform(np.array(X_valid[column]).reshape(-1, 1))
+
+test_process = preprocessing(test.copy())
+for column in test_process:
+    test_process[column] = MinMaxScaler().fit_transform(np.array(test_process[column]).reshape(-1, 1))
 
 #Logistic(train_process, y, test_process)
 #SVM(train_process, y, test_process)
