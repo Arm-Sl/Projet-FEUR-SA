@@ -506,7 +506,6 @@ def xGBoost(train_process, y, test_process):
     #model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
     model = xgb.XGBClassifier(colsample_bytree= 0.5, learning_rate=0.05, max_depth=6, n_estimators=100, objective='reg:logistic', random_state=20)
     model.fit(train_process, y)
-=======
     boosted_grid = {
             'n_estimators': [50, 100, 150, 200],
             'max_depth': [4, 8, 12],
@@ -523,7 +522,6 @@ def xGBoost(train_process, y, test_process):
     #model.fit(train_process, y)
     for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))
->>>>>>> Stashed changes
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
