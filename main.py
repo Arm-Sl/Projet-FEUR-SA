@@ -445,12 +445,6 @@ def dropColumns(df: DataFrame):
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
 
-    """df.drop("RoomService", axis=1, inplace=True)
-    df.drop("FoodCourt", axis=1, inplace=True)
-    df.drop("ShoppingMall", axis=1, inplace=True)
-    df.drop("Spa", axis=1, inplace=True)
-    df.drop("VRDeck", axis=1, inplace=True)"""
-
 def preprocessing(df):
     separateColumns(df)
     createNoBill(df)
@@ -497,27 +491,39 @@ def randomForest(train_process, y, test_process):
 
 def xGBoost(train_process, y, test_process):
     print("########  XGBOOST ########")
-    """boosted_grid = {
-        'n_estimators': [50, 100, 150, 200],
-        'max_depth': [4, 8, 12],
-        'learning_rate': [0.05, 0.1, 0.15]
-        }
-    booster = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss', random_state=0)
+    params = {
+        "objective": ['reg:logistic'],
+        'max_depth': [3,6,8,10,12], 
+        'learning_rate':[0.01, 0.05, 0.1, 0.15],
+        'random_state':[20],
+        'n_estimators': [100, 250, 500, 750, 1000],
+        'colsample_bytree': [0.5, 0.7, 1]
+    }
+    #  Meilleur parametre {'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_depth': 6, 'n_estimators': 100, 'objective': 'reg:logistic', 'random_state': 20}
+    """grid = GridSearchCV(estimator=xgb.XGBClassifier(), param_grid=params, n_jobs=-1, cv=5, verbose=2, scoring='neg_mean_squared_error').fit(train_process, y)
+    print("Best parameters:", grid.best_params_)
+    print("Lowest RMSE: ", (-grid.best_score_)**(1/2.0))"""
+    #model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
+    model = xgb.XGBClassifier(colsample_bytree= 0.5, learning_rate=0.05, max_depth=6, n_estimators=100, objective='reg:logistic', random_state=20)
+    model.fit(train_process, y)
+=======
+    boosted_grid = {
+            'n_estimators': [50, 100, 150, 200],
+            'max_depth': [4, 8, 12],
+            'learning_rate': [0.05, 0.1, 0.15]
+            }
+    booster = xgb.XGBClassifier(objective='binary:logistic', random_state=0, eval_metric='logloss')
     search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(train_process, y)
     model = search.best_estimator_
-
-    print(search.best_params_)
-    print(search.best_score_)"""
-    #### MEILLEUR HYPERPARAMETRE #####
-    # learning_rate =  0.05
-    # max_depth = 4
-    # n_estimators = 100
-    # booster = gbtree
-    # subsample = 0.5
-    # min_child_weight = 1
-    # gamma = 1
-    model = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss',random_state=0, learning_rate=0.05, max_depth=4, n_estimators=100, booster='gbtree', subsample=1, min_child_weight=1, gamma=1)
-    model.fit(train_process, y)
+    #model = xgb.XGBClassifier(objective='binary:logistic', eval_metric='logloss', learning_rate=0.05, max_depth=4,n_estimators=100)
+    # print(search.best_params_)
+    # learning_rate 0.05
+    # max_depth 4
+    # n_estimators 100
+    #model.fit(train_process, y)
+    for i in range(model.n_features_in_):
+        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))
+>>>>>>> Stashed changes
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -574,7 +580,7 @@ def Logistic(train_process, y, test_process):
     sub['Transported'] = pred.astype(bool)
     sub.to_csv("./Data/submit.csv", index=False)
 
-"""
+
 ##### PREPROCESSING DES DONNEES ######
 y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
@@ -583,12 +589,12 @@ test_process = preprocessing(test.copy())
 
 train_process.to_csv("./Data/train_process.csv", index=False)
 test_process.to_csv("./Data/test_process.csv", index=False)
-"""
 
+"""
 y = train["Transported"].copy().astype(int)
 train_process = pd.read_csv('./Data/train_process.csv')
 test_process = pd.read_csv('./Data/test_process.csv')
-
+"""
 
 #Logistic(train_process, y, test_process)
 #SVM(train_process, y, test_process)
