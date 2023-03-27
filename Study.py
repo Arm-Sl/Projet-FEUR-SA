@@ -134,3 +134,48 @@ def studyMissingValues(df: DataFrame):
     # studyMissingValuesDeck(df)
     # studyMissingValuesSide(df)
     studyMissingValuesVIP(df)
+
+
+def showBillWithCryo(train : DataFrame):
+    fig = plt.figure(figsize=(10, 20))
+    bill = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
+
+    for i, name in enumerate(bill):
+        ax = fig.add_subplot(5, 2, 2 * i + 1)
+        print("Nombre de personne en CryoSleep qui ont dépensé pour " + name + ": " + str(
+            len(train[(train["CryoSleep"] == True) & (train[name] > 0)])))
+        sns.barplot(data=train, x="CryoSleep", ax=ax, y=name, errwidth=0)
+        ax.set_title(name)
+    fig.tight_layout()
+    plt.show()
+
+def showBillWithTransported(train : DataFrame):
+    bill = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
+    fig = plt.figure(figsize=(10, 15))
+    for i, name in enumerate(bill):
+        ax = fig.add_subplot(3,2, i+1)
+        sns.histplot(data=train, x=name, bins=20, axes=ax, kde=True, hue="Transported")
+        plt.xlim([0,4000])
+        plt.ylim([0,2000])
+        ax.set_title(name)
+        plt.subplots_adjust(hspace=0.5)
+    plt.show()
+
+def showDeckTransported(train : DataFrame):
+    trainC = train.copy()
+    trainC[np.array(["Deck", "Num", "Side"])] = trainC["Cabin"].str.split('/', expand=True)
+    trainC.drop("Cabin", axis=1, inplace=True)
+    fig = plt.figure(figsize=(10, 20))
+    ax = fig.add_subplot(5, 2, 1)
+    sns.countplot(data=trainC, x="Side", ax=ax, hue="Transported")
+
+    ax = fig.add_subplot(5, 2, 3)
+    sns.countplot(data=trainC, x="Deck", ax=ax, hue="Transported", order=["A", "B", "C", "D", "E", "F", "G", "T"])
+    fig.tight_layout()
+    plt.show()
+
+def showAgeWithTransported(train : DataFrame):
+    plt.figure(figsize=(10, 4))
+    sns.histplot(data=train, x='Age', hue='Transported', binwidth=1, kde=True)
+    plt.xlabel('Age')
+    plt.show()
