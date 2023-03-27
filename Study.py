@@ -1,7 +1,3 @@
-__author__ = 'Antonin'
-__Filename = 'Study'
-__Creationdate__ = '27/03/2023'
-
 import matplotlib
 import pandas as pd
 from pandas import DataFrame

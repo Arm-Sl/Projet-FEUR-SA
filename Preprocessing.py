@@ -1,10 +1,4 @@
-__author__ = 'Antonin'
-
 from missingValues import missingValues
-
-__Filename = 'Preprocessing'
-__Creationdate__ = '27/03/2023'
-
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
