@@ -46,12 +46,17 @@ def findAgeIntervals(train):
 
     return liste
 
+def dropRemainingMissingValues(train):
+    print("Remaining missing values :  " + str(len(train[train.isna().sum(axis=1)>0])) + " / " + str(len(train)))
+    train.drop(train[train.isna().sum(axis=1) > 0].index, inplace=True)
+    print("After :  " + str(len(train)))
 
-def createAgeGroup(df: DataFrame):
+
+def createAgeGroup(df: DataFrame, train):
     print("Age missing values: ", df["Age"].isna().sum())
     df.loc[df["Age"].isna(), "Age"] = df["Age"].median()
     print("Age missing values: ", df["Age"].isna().sum())
-    liste = findAgeIntervals(df)
+    liste = findAgeIntervals(train)
     df["Age_group"] = np.nan
     prevAge = 0
     for i in range(1, len(liste)):
@@ -138,14 +143,15 @@ def dropColumns(df: DataFrame):
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
 
-def preprocessing(df):
+def preprocessing(df, train, test = False):
     separateColumns(df)
     createNoBill(df)
     createSolo(df)
     createLuxeBasic(df)
-    createAgeGroup(df)
+    createAgeGroup(df, train)
     missingValues(df)
-    #dropRemainingMissingValues(df)
+    if(not test):
+        dropRemainingMissingValues(df)
     handleCategorical(df)
     homePlanete, sides, destination, deck = createDummies(df)
     dropColumns(df)

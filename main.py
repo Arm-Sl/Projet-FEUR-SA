@@ -34,10 +34,52 @@ test = pd.read_csv('./Data/test.csv')
 # TODO comparer accuracy sans tuner et avec
 # TODO calculer moyenne et variance sur 5 itérations du modele
 
-def dropRemainingMissingValues(train):
-    print("Remaining missing values :  " + str(len(train[train.isna().sum(axis=1)>0])) + " / " + str(len(train)))
-    train.drop(train[train.isna().sum(axis=1) > 0].index, inplace=True)
-    print("After :  " + str(len(train)))
+
+def submit(data):
+    sub = pd.read_csv("./Data/sample_submission.csv")
+    sub['Transported'] = data.astype(bool)
+    sub.to_csv("./Data/submit.csv", index=False)
+
+def postprocessing(data, trainData, threshold = 0.002, step=0.001):
+    data = data[:, 1]
+    currentDistribution = np.round(data).sum()/len(data)
+    targetDistribution = np.round(trainData.astype(float)).sum()/len(trainData)
+    print("Current distribution : ", np.round(currentDistribution * 100,2), "%, taget distribution : ", np.round(targetDistribution * 100,2), "%.")
+
+    currentRoundValue = 0.5
+
+    startTime = time.time()
+
+    while(abs(currentDistribution - targetDistribution) > threshold and time.time() < startTime + 20):
+        dt = (currentDistribution - targetDistribution)
+        currentRoundValue += step * dt * dt * (1 if(dt > 0) else -1)
+        currentDistribution = (data > currentRoundValue).sum()/len(data)
+        print("current distribution : ", currentDistribution)
+
+
+    if(time.time() > startTime + 20):
+        roundValues = np.empty(1000, dtype=float)
+        distributions = np.empty(1000, dtype=float)
+        i=0
+        while(i<1000):
+            dt = (currentDistribution - targetDistribution)
+            currentRoundValue += step * dt * dt * (1 if(dt > 0) else -1)
+            currentDistribution = (data > currentRoundValue).sum()/len(data)
+
+            roundValues[i] = currentRoundValue
+            distributions[i] = abs(dt)
+
+            print("current distribution : ", currentDistribution)
+            i += 1
+
+        imin = distributions.argmin()
+        print("finish round value : ", roundValues[imin], ", final distribution : ", np.round(((data > roundValues[imin]).sum()/len(data))*100, 2))
+        return  (data > roundValues[imin])
+
+    print("finish round value : ", currentRoundValue, ", final distribution : ", np.round(currentDistribution*100, 2))
+    return (data > currentRoundValue)
+
+
 
 
 # Graphiques
@@ -79,10 +121,8 @@ def randomForest(train_process, y, test_process):
     model.fit(train_process, y)
     """for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))"""
-    pred = model.predict(test_process)
-    sub = pd.read_csv("./Data/sample_submission.csv")
-    sub['Transported'] = pred.astype(bool)
-    sub.to_csv("./Data/submit.csv", index=False)
+    pred = model.predict_proba(test_process)
+    return pred
 
 
 def xGBoost(train_process, y, test_process):
@@ -113,10 +153,8 @@ def xGBoost(train_process, y, test_process):
     auc = roc_auc_score(y_test, model.predict(X_test))
     plt.plot(fpr,tpr,label="xgBoost="+str(auc))
     print(classification_report(y_test, model.predict(X_test)))
-    pred = model.predict(test_process)
-    sub = pd.read_csv("./Data/sample_submission.csv")
-    sub['Transported'] = pred.astype(bool)
-    sub.to_csv("./Data/submit.csv", index=False)
+    pred = model.predict_proba(test_process)
+    return pred
     
 def SVM(train_process, y, test_process):
     print("########  SVM ########")
@@ -139,10 +177,8 @@ def SVM(train_process, y, test_process):
     auc = roc_auc_score(y_test, svc.predict(X_test))
     plt.plot(fpr,tpr,label="SVM="+str(auc))
     print(classification_report(y_test, svc.predict(X_test)))
-    pred = svc.predict(test_process)
-    sub = pd.read_csv("./Data/sample_submission.csv")
-    sub['Transported'] = pred.astype(bool)
-    sub.to_csv("./Data/submit.csv", index=False)
+    pred = svc.predict_proba(test_process)
+    return pred
 
 
 def Logistic(train_process, y, test_process):
@@ -170,25 +206,26 @@ def Logistic(train_process, y, test_process):
     auc = roc_auc_score(y_test, model.predict(X_test))
     plt.plot(fpr,tpr,label="regression="+str(auc))
     print(classification_report(y_test, model.predict(X_test)))
-    pred = model.predict(test_process)
-    sub = pd.read_csv("./Data/sample_submission.csv")
-    sub['Transported'] = pred.astype(bool)
-    sub.to_csv("./Data/submit.csv", index=False)
+    pred = model.predict_proba(test_process)
+    return pred
 
 
 ##### PREPROCESSING DES DONNEES ######
-y = train["Transported"].copy().astype(int)
-train_process = preprocessing(train.copy())
+train_process = preprocessing(train.copy(), train)
 y = train_process["Transported"].copy().astype(int)
 train_process.drop("Transported", axis=1, inplace=True)
-test_process = preprocessing(test.copy(), True)
+test_process = preprocessing(test.copy(), train, True)
 
 X_train, X_test, y_train, y_test = train_test_split(train_process, y, test_size=0.2, random_state=42)
 
-Logistic(train_process, y, test_process)
-SVM(train_process, y, test_process)
-xGBoost(train_process, y, test_process)
-randomForest(train_process, y, test_process)
+#predL = Logistic(train_process, y, test_process)
+#predSVM = SVM(train_process, y, test_process)
+predBoost = xGBoost(train_process, y, test_process)
+#predRandomForest = randomForest(train_process, y, test_process)
+
+postproc = postprocessing(predBoost, y)
+submit(postproc)
+
 plt.title('ROC curve')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive rate')
