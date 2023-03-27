@@ -10,9 +10,12 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from typing import *
 import numpy as np
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, roc_auc_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, \
+    roc_auc_score
 from sklearn.model_selection import cross_validate
+from sklearn.feature_selection import RFE
 import xgboost as xgb
+from scipy.stats import randint, expon, reciprocal, uniform
 import time
 matplotlib.use('tkagg')
 
@@ -278,106 +281,6 @@ def createSolo(df: DataFrame):
     plt.show()"""
 
 
-def studyMissingValuesVIP(df: DataFrame):
-    sns.countplot(data=df, x="VIP", hue="Transported")
-    plt.title("Nombre de Passager transporté en fonction du VIP")
-    plt.show()
-    df["VIP"], uniques = pd.factorize(df["VIP"])
-    print(abs(df["VIP"].corr(df["Transported"])))
-
-
-def studyMissingValuesSide(df: DataFrame):
-    groupSide = (df.groupby(["Group", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
-    surnameSide = (df[df["Group_size"] > 1].groupby(["Surname", "Side"])["Side"].size().unstack().fillna(0) > 0).sum(axis=1)
-    sideSolo = df[df["Solo"] == 1]
-
-    sns.barplot(x=groupSide.value_counts().index, y=groupSide.value_counts().values)
-    plt.title("Nombre de Side par Groupe")
-    plt.show()
-
-    sns.barplot(x=surnameSide.value_counts().index, y=surnameSide.value_counts().values)
-    plt.title("Nombre de Side par Surname")
-    plt.show()
-
-    sns.countplot(sideSolo, x="Side")
-    plt.title("Répartition des Side pour les passagers voyageant seul")
-    plt.show()
-
-
-def studyMissingValuesDeck(df: DataFrame):
-    df[np.array(["Deck", "Num", "Side"])] = df["Cabin"].str.split('/', expand=True)
-    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
-    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(" ", expand=True)
-    createSolo(df)
-
-    deckDestination = df.groupby(["Destination", "Deck"])["Deck"].size().unstack().fillna(0)
-    sns.heatmap(deckDestination, annot=True, fmt='g', cmap='coolwarm')
-    plt.show()
-
-    deckHomePlanet = df.groupby(["HomePlanet", "Deck"])["Deck"].size().unstack().fillna(0)
-    sns.heatmap(deckHomePlanet, annot=True, fmt='g', cmap='coolwarm')
-    plt.show()
-
-    deckGroup = (df.groupby(["Group", "Deck"])["Deck"].size().unstack().fillna(0) > 0).sum(axis=1)
-    sns.barplot(x=deckGroup.value_counts().index, y=deckGroup.value_counts().values)
-    plt.title("Nombre de deck par groupe")
-    plt.show()
-
-    surnameGroup = (df.groupby(["Surname", "Deck"])["Deck"].size().unstack().fillna(0) > 0).sum(axis=1)
-    sns.barplot(x=surnameGroup.value_counts().index, y=surnameGroup.value_counts().values)
-    plt.title("Nombre de deck par Surname")
-    plt.show()
-
-    SoloGroup = df.groupby(["HomePlanet", "Solo", "Deck"])["Deck"].size().unstack().fillna(0)
-    sns.heatmap(SoloGroup, annot=True, fmt='g', cmap='coolwarm')
-    plt.show()
-
-
-def studyMissingValuesDestination(df: DataFrame):
-    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(' ', expand=True)
-    destinationSurname = (df.groupby(["Surname", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
-   
-    sns.barplot(x=destinationSurname.value_counts().index, y=destinationSurname.value_counts().values)
-    plt.title("Nombre de destination par Surname")
-    plt.show()
-
-    df[np.array(["Deck", "Num", "Side"])] = df["Cabin"].str.split('/', expand=True)
-    destinationDeck = df.groupby(["Deck", "Destination"])["Destination"].size().unstack().fillna(0)
-    sns.heatmap(destinationDeck, annot=True, fmt='g', cmap='coolwarm')
-    plt.show()
-
-    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
-    destinationGroup = (df.groupby(["Group", "Destination"])["Destination"].size().unstack().fillna(0) > 0).sum(axis=1)
-    sns.barplot(x=destinationGroup.value_counts().index, y = destinationGroup.value_counts().values)
-    plt.title("Nombre de destination par Groupe")
-    plt.show()
-
-    sns.countplot(df, x="Destination", hue="Transported")
-    plt.show()
-
-
-def studyMissingValuesHomePlanet(df: DataFrame):
-    df[np.array(["Group", "NbInGroup"])] = df["PassengerId"].str.split('_', expand=True)
-
-    homePlanetGroup = df.groupby(["Group", "HomePlanet"])
-    nombreDeHomePlanetDifferentesParGroupe = (homePlanetGroup["HomePlanet"].size().unstack().fillna(0) > 0).sum(axis=1)
-    groupesPlusDe1HomePlanet = nombreDeHomePlanetDifferentesParGroupe.loc[nombreDeHomePlanetDifferentesParGroupe > 1]
-    print("Nombre de groupes avec plus de 1 HomePlanet : " + str(len(groupesPlusDe1HomePlanet)))
-    sns.countplot(nombreDeHomePlanetDifferentesParGroupe)
-    plt.title('Nombre de HomePlanet par Group')
-    plt.show()
-
-    df[np.array(["FirstName", "Surname"])] = df["Name"].str.split(' ', expand=True)
-
-    homePlanetSurname = df.groupby(["Surname", "HomePlanet"])
-    nombreDeHomePlanetDifferentesParSurname = (homePlanetSurname["Surname"].size().unstack().fillna(0) > 0).sum(axis=1)
-    surnamePlusDe1HomePlanet = nombreDeHomePlanetDifferentesParSurname.loc[nombreDeHomePlanetDifferentesParSurname > 1]
-
-    print("Nombre de Surname avec plus de 1 HomePlanet : " + str(len(surnamePlusDe1HomePlanet)))
-    sns.countplot(nombreDeHomePlanetDifferentesParSurname)
-    plt.title('Nombre de HomePlanet par Surname')
-    plt.show()
-
 
 def missingValues(df: DataFrame):
     missingValuesHomePlanet(df)
@@ -387,14 +290,6 @@ def missingValues(df: DataFrame):
     missingValueSide(df)
     missingValueVIP(df)
     missingValueDeck(df)
-
-def studyMissingValues(df: DataFrame):
-    df = df.copy(deep=True)
-    # studyMissingValuesHomePlanet(df)
-    # studyMissingValuesDestination(df)
-    # studyMissingValuesDeck(df)
-    # studyMissingValuesSide(df)
-    studyMissingValuesVIP(df)
 
 def createDummies(df: DataFrame):
     # planetes
@@ -443,15 +338,14 @@ def dropColumns(df: DataFrame):
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
 
-def preprocessing(df, test=False):
+def preprocessing(df):
     separateColumns(df)
     createNoBill(df)
     createSolo(df)
     createLuxeBasic(df)
     createAgeGroup(df)
     missingValues(df)
-    if not test:
-        dropRemainingMissingValues(df)
+    #dropRemainingMissingValues(df)
     handleCategorical(df)
     homePlanete, sides, destination, deck = createDummies(df)
     dropColumns(df)
@@ -479,13 +373,9 @@ def randomForest(train_process, y, test_process):
     # max_features: sqrt
     # n_estimators: 200
     model = RandomForestClassifier(max_depth=8, criterion='entropy', max_features='sqrt', n_estimators=200)
-    model.fit(X_train, y_train)
+    model.fit(train_process, y)
     """for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))"""
-    fpr, tpr, _ = roc_curve(y_test, model.predict(X_test))
-    auc = roc_auc_score(y_test, model.predict(X_test))
-    plt.plot(fpr,tpr,label="Random="+str(auc))
-    print(classification_report(y_test, model.predict(X_test)))
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -584,6 +474,7 @@ def Logistic(train_process, y, test_process):
 
 
 ##### PREPROCESSING DES DONNEES ######
+y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
 y = train_process["Transported"].copy().astype(int)
 train_process.drop("Transported", axis=1, inplace=True)
