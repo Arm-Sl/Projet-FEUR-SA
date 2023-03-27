@@ -10,12 +10,10 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from typing import *
 import numpy as np
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, roc_auc_score
 from sklearn.model_selection import cross_validate
-from sklearn.feature_selection import RFE
 import xgboost as xgb
-from scipy.stats import randint, expon, reciprocal, uniform
-
+import time
 matplotlib.use('tkagg')
 
 # Lecture des fichiers CSV
@@ -445,14 +443,15 @@ def dropColumns(df: DataFrame):
     df.drop("Group_size", axis=1, inplace=True)
     df.drop("Age", axis=1, inplace=True)
 
-def preprocessing(df):
+def preprocessing(df, test=False):
     separateColumns(df)
     createNoBill(df)
     createSolo(df)
     createLuxeBasic(df)
     createAgeGroup(df)
     missingValues(df)
-    #dropRemainingMissingValues(df)
+    if not test:
+        dropRemainingMissingValues(df)
     handleCategorical(df)
     homePlanete, sides, destination, deck = createDummies(df)
     dropColumns(df)
@@ -480,9 +479,13 @@ def randomForest(train_process, y, test_process):
     # max_features: sqrt
     # n_estimators: 200
     model = RandomForestClassifier(max_depth=8, criterion='entropy', max_features='sqrt', n_estimators=200)
-    model.fit(train_process, y)
+    model.fit(X_train, y_train)
     """for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))"""
+    fpr, tpr, _ = roc_curve(y_test, model.predict(X_test))
+    auc = roc_auc_score(y_test, model.predict(X_test))
+    plt.plot(fpr,tpr,label="Random="+str(auc))
+    print(classification_report(y_test, model.predict(X_test)))
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -491,37 +494,32 @@ def randomForest(train_process, y, test_process):
 
 def xGBoost(train_process, y, test_process):
     print("########  XGBOOST ########")
-    params = {
-        "objective": ['reg:logistic'],
-        'max_depth': [3,6,8,10,12], 
-        'learning_rate':[0.01, 0.05, 0.1, 0.15],
-        'random_state':[20],
-        'n_estimators': [100, 250, 500, 750, 1000],
-        'colsample_bytree': [0.5, 0.7, 1]
-    }
-    #  Meilleur parametre {'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_depth': 6, 'n_estimators': 100, 'objective': 'reg:logistic', 'random_state': 20}
-    """grid = GridSearchCV(estimator=xgb.XGBClassifier(), param_grid=params, n_jobs=-1, cv=5, verbose=2, scoring='neg_mean_squared_error').fit(train_process, y)
-    print("Best parameters:", grid.best_params_)
-    print("Lowest RMSE: ", (-grid.best_score_)**(1/2.0))"""
-    #model = xgb.XGBClassifier(objective= 'binary:logistic', random_state=0, eval_metric='logloss', learning_rate=0.05, max_depth=6, n_estimators=200, gamma=1, colsample_bytree=0.5)
-    model = xgb.XGBClassifier(colsample_bytree= 0.5, learning_rate=0.05, max_depth=6, n_estimators=100, objective='reg:logistic', random_state=20)
-    model.fit(train_process, y)
-    boosted_grid = {
-            'n_estimators': [50, 100, 150, 200],
-            'max_depth': [4, 8, 12],
-            'learning_rate': [0.05, 0.1, 0.15]
-            }
-    booster = xgb.XGBClassifier(objective='binary:logistic', random_state=0, eval_metric='logloss')
-    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=10, scoring='f1', verbose=0).fit(train_process, y)
+    """boosted_grid = {
+        'n_estimators': [50, 100, 150, 200],
+        'max_depth': [4, 8, 12],
+        'learning_rate': [0.05, 0.1, 0.15],
+        'subsample': [0.5, 0.75, 1]
+        }
+    booster = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss', random_state=0)
+    search = GridSearchCV(estimator=booster, param_grid=boosted_grid, n_jobs=-1, cv=5, scoring='f1', verbose=0).fit(train_process, y)
     model = search.best_estimator_
-    #model = xgb.XGBClassifier(objective='binary:logistic', eval_metric='logloss', learning_rate=0.05, max_depth=4,n_estimators=100)
-    # print(search.best_params_)
-    # learning_rate 0.05
-    # max_depth 4
-    # n_estimators 100
-    #model.fit(train_process, y)
-    for i in range(model.n_features_in_):
-        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))
+    print(search.best_params_)"""
+    #### MEILLEUR HYPERPARAMETRE #####
+    # learning_rate =  0.05
+    # max_depth = 4
+    # n_estimators = 100
+    # booster = gbtree
+    # subsample = 1
+    # min_child_weight = 1
+    # gamma = 1
+    model = xgb.XGBClassifier(objective= 'binary:logistic', eval_metric='logloss', learning_rate=0.05, max_depth=4, n_estimators=100, booster='gbtree', subsample=1, min_child_weight=1, gamma=1)
+    model.fit(X_train, y_train)
+    """for i in range(model.n_features_in_):
+        print(model.feature_names_in_[i] + "  :  " + str(model.feature_importances_[i]))"""
+    fpr, tpr, _ = roc_curve(y_test, model.predict(X_test))
+    auc = roc_auc_score(y_test, model.predict(X_test))
+    plt.plot(fpr,tpr,label="xgBoost="+str(auc))
+    print(classification_report(y_test, model.predict(X_test)))
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -531,21 +529,23 @@ def SVM(train_process, y, test_process):
     print("########  SVM ########")
     ##### DETERMINATION MEILLEUR HYPERPARAMETRE #####
     """parameters = {
-        'C':[0.001, 0.01, 0.1, 1, 10, 100, 1000],
+        'C':[0.001, 0.01, 0.1, 1, 10, 100],
         'kernel':['linear']
     }
     svc = SVC()
-    grid = GridSearchCV(estimator = svc, param_grid = parameters, scoring = 'accuracy', cv = 5, verbose=2, n_jobs=-1)
+    grid = GridSearchCV(estimator = svc, param_grid = parameters, scoring = 'accuracy', cv = 5, verbose=0, n_jobs=-1)
     grid.fit(train_process, y)
-    print('GridSearch CV best score : {:.4f}\n\n'.format(grid.best_score_))
     print('Parameters that give the best results :','\n\n', (grid.best_params_))
-    print('\n\nEstimator that was chosen by the search :','\n\n', (grid.best_estimator_))"""
-
+    svc = grid.best_estimator_"""
     #### MEILLEUR HYPERPARAMETRE #####
     # C = 1
     # kernel = "linear"
-    svc = SVC(kernel="linear", C=1)
-    svc.fit(train_process,y)
+    svc = SVC(kernel="linear", C=1, probability=True)
+    svc.fit(X_train,y_train)
+    fpr, tpr, _ = roc_curve(y_test, svc.predict(X_test))
+    auc = roc_auc_score(y_test, svc.predict(X_test))
+    plt.plot(fpr,tpr,label="SVM="+str(auc))
+    print(classification_report(y_test, svc.predict(X_test)))
     pred = svc.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -560,9 +560,9 @@ def Logistic(train_process, y, test_process):
                     "max_iter": [1000, 10000, 100000]
                 }
     search = GridSearchCV(LogisticRegression(), parameters, scoring='accuracy', n_jobs=-1, cv=5, verbose=0).fit(train_process, y)
-    model2 = search.best_estimator_
-    print(search.best_params_)"""
-    
+    model = search.best_estimator_
+    print(search.best_params_)
+    """
     #### MEILLEUR HYPERPARAMETRE #####
     # C = 100
     # max_iter = 1000
@@ -570,9 +570,13 @@ def Logistic(train_process, y, test_process):
     # solver = saga
     
     model = LogisticRegression(C=100, max_iter=1000, penalty='l2', solver='saga')
-    model.fit(train_process, y)
+    model.fit(X_train, y_train)
     """for i in range(model.n_features_in_):
         print(model.feature_names_in_[i] + "  :  " + str(model.coef_[0][i]))"""
+    fpr, tpr, _ = roc_curve(y_test, model.predict(X_test))
+    auc = roc_auc_score(y_test, model.predict(X_test))
+    plt.plot(fpr,tpr,label="regression="+str(auc))
+    print(classification_report(y_test, model.predict(X_test)))
     pred = model.predict(test_process)
     sub = pd.read_csv("./Data/sample_submission.csv")
     sub['Transported'] = pred.astype(bool)
@@ -580,22 +584,28 @@ def Logistic(train_process, y, test_process):
 
 
 ##### PREPROCESSING DES DONNEES ######
-y = train["Transported"].copy().astype(int)
 train_process = preprocessing(train.copy())
+y = train_process["Transported"].copy().astype(int)
 train_process.drop("Transported", axis=1, inplace=True)
-test_process = preprocessing(test.copy())
+test_process = preprocessing(test.copy(), True)
 
-train_process.to_csv("./Data/train_process.csv", index=False)
-test_process.to_csv("./Data/test_process.csv", index=False)
+X_train, X_test, y_train, y_test = train_test_split(train_process, y, test_size=0.2, random_state=42)
 
-"""
-y = train["Transported"].copy().astype(int)
-train_process = pd.read_csv('./Data/train_process.csv')
-test_process = pd.read_csv('./Data/test_process.csv')
-"""
-
-#Logistic(train_process, y, test_process)
-#SVM(train_process, y, test_process)
+Logistic(train_process, y, test_process)
+SVM(train_process, y, test_process)
 xGBoost(train_process, y, test_process)
-#randomForest(train_process, y, test_process)
+randomForest(train_process, y, test_process)
+plt.title('ROC curve')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive rate')
+plt.legend(loc='best')
+plt.show()
 
+"""
+df1 = pd.DataFrame()
+df1["precision"] = [0.74655, 0.78887, 0.7912, 0.7898, 0.79003, 0.78933, 0.7898, 0.79284]
+df1["m_p"] = ["regression", "SVM", 'random', 'random', 'random', 'random', 'random', 'xgboost']
+
+sns.stripplot(data=df1, x="m_p", y="precision", hue="m_p", dodge=False)
+plt.show()
+"""
